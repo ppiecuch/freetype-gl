@@ -33,7 +33,7 @@
 PLATFORM		= $(shell uname)
 CC				= gcc
 CFLAGS			= -Wno-deprecated-declarations -Wall `freetype-config --cflags` \
-	              -I/usr/X11/include -O3 -I/opt/X11/include
+	              -I/usr/X11/include -O3 -I/opt/X11/include -I/opt/local/include
 LIBS			= -lGLEW -lGL -lglut -lGLU -lm \
 	              `freetype-config --libs`
 ifeq ($(PLATFORM), Darwin)

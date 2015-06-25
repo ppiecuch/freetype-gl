@@ -20,12 +20,14 @@ IF (WIN32)
 ELSE (WIN32)
     FIND_PATH(ANT_TWEAK_BAR_INCLUDE_PATH AntTweakBar.h
       PATHS
+      /opt/local/include
       /usr/local/include
       /usr/X11/include
       /usr/include)
 
 FIND_LIBRARY( ANT_TWEAK_BAR_LIBRARY AntTweakBar
   PATHS
+    /opt/local
     /usr/local
     /usr/X11
     /usr

@@ -31,10 +31,12 @@
  * policies, either expressed or implied, of Nicolas P. Rougier.
  * ============================================================================
  */
+
+#if !defined(FTGL_AMALGAMATE) || (defined(FTGL_AMALGAMATE) && (defined(FTGL_WITH_FT2) || defined(HAVE_FREETYPE2) || defined(HAVE_FT2)))
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_STROKER_H
-// #include FT_ADVANCES_H
 #include FT_LCD_FILTER_H
 #include <stdint.h>
 #include <stdlib.h>
@@ -226,7 +228,7 @@ texture_font_generate_kerning( texture_font_t *self )
         return;
 
     /* For each glyph couple combination, check if kerning is necessary */
-    /* Starts at index 1 since 0 is for the special backgroudn glyph */
+    /* Starts at index 1 since 0 is for the special background glyph */
     for( i=1; i<self->glyphs->size; ++i )
     {
         glyph = *(texture_glyph_t **) vector_get( self->glyphs, i );
@@ -713,3 +715,79 @@ texture_font_get_glyph( texture_font_t * self,
     }
     return NULL;
 }
+
+#else  // FT2 available
+
+// ------------------------------------------------------ texture_glyph_new ---
+texture_glyph_t *
+texture_glyph_new(void)
+{
+    return NULL;
+}
+
+
+// --------------------------------------------------- texture_glyph_delete ---
+void
+texture_glyph_delete( texture_glyph_t *self )
+{
+    assert( self );
+    vector_delete( self->kerning );
+    free( self );
+}
+
+// ---------------------------------------------- texture_glyph_get_kerning ---
+float
+texture_glyph_get_kerning( const texture_glyph_t * self,
+                           const wchar_t charcode )
+{
+    return 0;
+}
+
+
+// ------------------------------------------ texture_font_generate_kerning ---
+void
+texture_font_generate_kerning( texture_font_t *self )
+{
+}
+
+// --------------------------------------------- texture_font_new_from_file ---
+texture_font_t *
+texture_font_new_from_file(texture_atlas_t *atlas, const float pt_size,
+        const char *filename)
+{
+    return NULL;
+}
+
+// ------------------------------------------- texture_font_new_from_memory ---
+texture_font_t *
+texture_font_new_from_memory(texture_atlas_t *atlas, float pt_size,
+        const void *memory_base, size_t memory_size)
+{
+    return NULL;
+}
+
+// ---------------------------------------------------- texture_font_delete ---
+void
+texture_font_delete( texture_font_t *self )
+{
+}
+
+
+// ----------------------------------------------- texture_font_load_glyphs ---
+size_t
+texture_font_load_glyphs( texture_font_t * self,
+                          const wchar_t * charcodes )
+{
+    return 0;
+}
+
+
+// ------------------------------------------------- texture_font_get_glyph ---
+texture_glyph_t *
+texture_font_get_glyph( texture_font_t * self,
+                        wchar_t charcode )
+{
+    return NULL;
+}
+
+#endif // FT2 available

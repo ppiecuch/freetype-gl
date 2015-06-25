@@ -34,8 +34,10 @@
 #ifndef __OPEN_GL_H__
 #define __OPEN_GL_H__
 
-#if defined(__APPLE__)
-#   include <GL/glew.h>
+#if defined(QT_OPENGL_LIB)
+#  include <QtOpenGL>
+#elif defined(__APPLE__)
+#  include <GL/glew.h>
 #  ifdef GL_ES_VERSION_2_0
 #    include <OpenGLES/ES2/gl.h>
 #  else
