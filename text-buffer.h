@@ -43,6 +43,9 @@ extern "C" {
 #include "markup.h"
 #include "shader.h"
 
+#ifdef __cplusplus
+namespace ftgl {
+#endif
 
 /**
  * Use LCD filtering
@@ -80,12 +83,12 @@ extern "C" {
  */
 typedef struct  text_buffer_t {
     /**
-     * Vertex buffer 
+     * Vertex buffer
      */
     vertex_buffer_t *buffer;
 
     /**
-     * Font manager 
+     * Font manager
      */
     font_manager_t *manager;
 
@@ -208,6 +211,23 @@ typedef struct glyph_vertex_t {
   text_buffer_t *
   text_buffer_new( size_t depth );
 
+
+
+/**
+ * Creates a new empty text buffer using custom shaders.
+ *
+ * @param depth          Underlying atlas bit depth (1 or 3)
+ * @param vert_filename  Path to vertex shader
+ * @param frag_filename  Path to fragment shader
+ *
+ * @return  a new empty text buffer.
+ *
+ */
+  text_buffer_t *
+  text_buffer_new_with_shaders( size_t depth,
+                                const char * vert_filename,
+                                const char * frag_filename );
+
   /**
   * Deletes texture buffer and its associated shader and vertex buffer.
   *
@@ -279,6 +299,7 @@ text_buffer_delete( text_buffer_t * self );
 /** @} */
 
 #ifdef __cplusplus
+}
 }
 #endif
 

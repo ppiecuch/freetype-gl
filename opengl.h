@@ -36,8 +36,9 @@
 
 #if defined(QT_OPENGL_LIB)
 #  include <QtOpenGL>
+#elif defined(QT_GUI_LIB)
+#  include <qtopengl.h>
 #elif defined(__APPLE__)
-#  include <GL/glew.h>
 #  ifdef GL_ES_VERSION_2_0
 #    include <OpenGLES/ES2/gl.h>
 #  else

@@ -5,7 +5,7 @@
 # ANT_TWEAK_BAR_FOUND
 # ANT_TWEAK_BAR_INCLUDE_PATH
 # ANT_TWEAK_BAR_LIBRARY
-# 
+#
 
 IF (WIN32)
 	FIND_PATH( ANT_TWEAK_BAR_INCLUDE_PATH AntTweakBar.h
@@ -20,14 +20,12 @@ IF (WIN32)
 ELSE (WIN32)
     FIND_PATH(ANT_TWEAK_BAR_INCLUDE_PATH AntTweakBar.h
       PATHS
-      /opt/local/include
       /usr/local/include
       /usr/X11/include
       /usr/include)
 
 FIND_LIBRARY( ANT_TWEAK_BAR_LIBRARY AntTweakBar
   PATHS
-    /opt/local
     /usr/local
     /usr/X11
     /usr
@@ -45,3 +43,4 @@ ENDIF (ANT_TWEAK_BAR_INCLUDE_PATH AND ANT_TWEAK_BAR_LIBRARY)
 
 INCLUDE(${CMAKE_ROOT}/Modules/FindPackageHandleStandardArgs.cmake)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(AntTweakBar DEFAULT_MSG ANT_TWEAK_BAR_INCLUDE_PATH ANT_TWEAK_BAR_LIBRARY)
+
