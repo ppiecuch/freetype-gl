@@ -38,15 +38,15 @@ OPTION(freetype-gl_USE_VAO "Use a VAO to render a vertex_buffer instance (requir
 OPTION(freetype-gl_BUILD_DEMOS "Build the freetype-gl example programs" ON)
 OPTION(freetype-gl_BUILD_APIDOC "Build the freetype-gl API documentation" ON)
 OPTION(freetype-gl_BUILD_HARFBUZZ "Build the freetype-gl harfbuzz support (experimental)" OFF)
+OPTION(freetype-gl_BUILD_MAKEFONT "Build the makefont tool" ON)
 OPTION(freetype-gl_LIBS_SUPPLIED "Required libraries are supplied as part of parent build" OFF)
+OPTION(freetype-gl_GLFW_SUPPLIED "GLFW library is supplied as part of parent build" OFF)
 
 # Get required and optional library
 FIND_PACKAGE( OpenGL REQUIRED )
 IF( WIN32 OR WIN64 )
-    SET( GLUT_INCLUDE_DIR
-         ${CMAKE_CURRENT_SOURCE_DIR}/windows/glut )
-    SET( GLUT_LIBRARY
-         ${CMAKE_CURRENT_SOURCE_DIR}/windows/glut/glut32.lib )
+	SET( WINDOWS_DIR
+         ${CMAKE_CURRENT_SOURCE_DIR}/windows )
     SET( GLEW_INCLUDE_PATH
          ${CMAKE_CURRENT_SOURCE_DIR}/windows/glew/include )
     SET( GLEW_LIBRARY
@@ -63,13 +63,11 @@ IF( WIN32 OR WIN64 )
          ${CMAKE_CURRENT_SOURCE_DIR}/windows/include )
 ELSE( WIN32 OR WIN64 )
     IF ( freetype-gl_LIBS_SUPPLIED )
-        FIND_PACKAGE( GLUT )
         FIND_PACKAGE( Freetype )
         IF ( NOT APPLE )
             FIND_PACKAGE( GLEW )
         ENDIF()
     ELSE ( freetype-gl_LIBS_SUPPLIED )
-        FIND_PACKAGE( GLUT REQUIRED )
         FIND_PACKAGE( Freetype REQUIRED )
         IF ( NOT APPLE )
             FIND_PACKAGE( GLEW REQUIRED )
@@ -79,7 +77,11 @@ ELSE( WIN32 OR WIN64 )
     FIND_LIBRARY( MATH_LIBRARY m )
 ENDIF( WIN32 OR WIN64 )
 
-INCLUDE_DIRECTORIES( ${GLUT_INCLUDE_DIR}
+IF ( NOT freetype-gl_LIBS_SUPPLIED )
+    FIND_PACKAGE( glfw3 REQUIRED )
+ENDIF ( NOT freetype-gl_LIBS_SUPPLIED )
+
+INCLUDE_DIRECTORIES( ${GLFW3_INCLUDE_DIR}
                      ${OPENGL_INCLUDE_DIRS}
                      ${FREETYPE_INCLUDE_DIRS}
                      ${CMAKE_CURRENT_SOURCE_DIR}
@@ -111,25 +113,30 @@ SET( FREETYPE_GL_SRC freetype-gl.h
 
 ADD_LIBRARY( freetype-gl STATIC ${FREETYPE_GL_SRC} )
 
-LINK_DIRECTORIES(${PROJECT_SOURCE_DIR})
+LINK_DIRECTORIES(
+    ${PROJECT_SOURCE_DIR}
+    ${GLFW3_LIBRARY_DIR}
+)
 
-ADD_EXECUTABLE( makefont makefont.c )
+IF (freetype-gl_BUILD_MAKEFONT)
+    ADD_EXECUTABLE( makefont makefont.c )
 
-IF(NOT APPLE)
-    TARGET_LINK_LIBRARIES( makefont ${GLEW_LIBRARY} )
-ENDIF()
+    IF(NOT APPLE)
+        TARGET_LINK_LIBRARIES( makefont ${GLEW_LIBRARY} )
+    ENDIF()
 
-TARGET_LINK_LIBRARIES( makefont
-                       freetype-gl
-                       ${OPENGL_LIBRARY}
-                       ${GLUT_LIBRARY}
-                       ${FREETYPE_LIBRARY}
-                       ${MATH_LIBRARY})
+    TARGET_LINK_LIBRARIES( makefont
+                           freetype-gl
+                           ${OPENGL_LIBRARY}
+                           ${GLFW3_LIBRARY}
+                           ${FREETYPE_LIBRARY}
+                           ${MATH_LIBRARY})
 
-if(MSVC)
-    # Compile makefont as C++
-    set_source_files_properties( makefont.c PROPERTIES LANGUAGE CXX )
-endif()
+    if(MSVC)
+        # Compile makefont as C++
+        set_source_files_properties( makefont.c PROPERTIES LANGUAGE CXX )
+    endif()
+ENDIF (freetype-gl_BUILD_MAKEFONT)
 
 IF (freetype-gl_BUILD_APIDOC)
     ADD_SUBDIRECTORY(doc)
