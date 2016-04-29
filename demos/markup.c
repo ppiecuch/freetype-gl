@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <fontconfig/fontconfig.h>
+
 #include "freetype-gl.h"
 #include "vertex-buffer.h"
 #include "text-buffer.h"
@@ -47,16 +48,26 @@
 #include "mat4.h"
 
 #include <GLFW/glfw3.h>
+#include <vec234.h>
+
+
+// ------------------------------------------------------- typedef & struct ---
+typedef struct {
+    float x, y, z;
+    float r, g, b, a;
+} vertex_t;
 
 
 // ------------------------------------------------------- global variables ---
 text_buffer_t * buffer;
 mat4 model, view, projection;
+vertex_buffer_t *lines_buffer;
+GLuint shader;
 
 
 // ------------------------------------------------------ match_description ---
 char *
-match_description( char * family, float size, int bold, int italic )
+match_description( char * description )
 {
 
 #if defined _WIN32 || defined _WIN64
@@ -66,22 +77,8 @@ match_description( char * family, float size, int bold, int italic )
 #endif
 
     char *filename = 0;
-    int weight = FC_WEIGHT_REGULAR;
-    int slant = FC_SLANT_ROMAN;
-    if ( bold )
-    {
-        weight = FC_WEIGHT_BOLD;
-    }
-    if( italic )
-    {
-        slant = FC_SLANT_ITALIC;
-    }
     FcInit();
-    FcPattern *pattern = FcPatternCreate();
-    FcPatternAddDouble( pattern, FC_SIZE, size );
-    FcPatternAddInteger( pattern, FC_WEIGHT, weight );
-    FcPatternAddInteger( pattern, FC_SLANT, slant );
-    FcPatternAddString( pattern, FC_FAMILY, (FcChar8*) family );
+    FcPattern *pattern = FcNameParse(description);
     FcConfigSubstitute( 0, pattern, FcMatchPattern );
     FcDefaultSubstitute( pattern );
     FcResult result;
@@ -90,7 +87,7 @@ match_description( char * family, float size, int bold, int italic )
 
     if ( !match )
     {
-        fprintf( stderr, "fontconfig error: could not match family '%s'", family );
+        fprintf( stderr, "fontconfig error: could not match description '%s'", description );
         return 0;
     }
     else
@@ -99,7 +96,7 @@ match_description( char * family, float size, int bold, int italic )
         FcResult result = FcPatternGet( match, FC_FILE, 0, &value );
         if ( result )
         {
-            fprintf( stderr, "fontconfig error: could not match family '%s'", family );
+            fprintf( stderr, "fontconfig error: could not match description '%s'", description );
         }
         else
         {
@@ -110,95 +107,11 @@ match_description( char * family, float size, int bold, int italic )
     return filename;
 }
 
-
-// ---------------------------------------------------------------- display ---
-void display( GLFWwindow* window )
+void init()
 {
-    glClearColor(0.40,0.40,0.45,1.00);
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
-    glColor4f(1.00,1.00,1.00,1.00);
-    glUseProgram( buffer->shader );
-    {
-        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "model" ),
-                            1, 0, model.data);
-        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "view" ),
-                            1, 0, view.data);
-        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "projection" ),
-                            1, 0, projection.data);
-        text_buffer_render( buffer );
-    }
-
-    glfwSwapBuffers( window );
-}
-
-
-// --------------------------------------------------------------- reshape ---
-void reshape( GLFWwindow* window, int width, int height )
-{
-    glViewport(0, 0, width, height);
-    mat4_set_orthographic( &projection, 0, width, 0, height, -1, 1);
-}
-
-
-// --------------------------------------------------------------- keyboard ---
-void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
-{
-    if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
-    {
-        glfwSetWindowShouldClose( window, GL_TRUE );
-    }
-}
-
-
-/* -------------------------------------------------------- error-callback - */
-void error_callback( int error, const char* description )
-{
-    fputs( description, stderr );
-}
-
-
-// ------------------------------------------------------------------- main ---
-int main( int argc, char **argv )
-{
-    GLFWwindow* window;
-
-    glfwSetErrorCallback( error_callback );
-
-    if (!glfwInit( ))
-    {
-        exit( EXIT_FAILURE );
-    }
-
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
-    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
-
-    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
-
-    if (!window)
-    {
-        glfwTerminate( );
-        exit( EXIT_FAILURE );
-    }
-
-    glfwMakeContextCurrent( window );
-    glfwSwapInterval( 1 );
-
-    glfwSetFramebufferSizeCallback( window, reshape );
-    glfwSetWindowRefreshCallback( window, display );
-    glfwSetKeyCallback( window, keyboard );
-
-#ifndef __APPLE__
-    GLenum err = glewInit();
-    if (GLEW_OK != err)
-    {
-        /* Problem: glewInit failed, something is seriously wrong. */
-        fprintf( stderr, "Error: %s\n", glewGetErrorString(err) );
-        exit( EXIT_FAILURE );
-    }
-    fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
-#endif
-    buffer = text_buffer_new( LCD_FILTERING_ON );
+    buffer = text_buffer_new( LCD_FILTERING_ON,
+                              "shaders/text.vert",
+                              "shaders/text.frag" );
 
     vec4 black  = {{0.0, 0.0, 0.0, 1.0}};
     vec4 white  = {{1.0, 1.0, 1.0, 1.0}};
@@ -206,11 +119,11 @@ int main( int argc, char **argv )
     vec4 grey   = {{0.5, 0.5, 0.5, 1.0}};
     vec4 none   = {{1.0, 1.0, 1.0, 0.0}};
 
-    char *f_normal   = match_description("Droid Serif", 24, 0, 0);
-    char *f_bold     = match_description("Droid Serif", 24, 1, 0);
-    char *f_italic   = match_description("Droid Serif", 24, 0, 1);
-    char *f_japanese = match_description("Droid Sans Japanese", 18, 0, 0);
-    char *f_math     = match_description("DejaVu Sans", 24, 0, 0);
+    char *f_normal   = match_description("Droid Serif:size=24");
+    char *f_bold     = match_description("Droid Serif:size=24:weight=bold");
+    char *f_italic   = match_description("Droid Serif:size=24:slant=italic");
+    char *f_japanese = match_description("Droid Sans:size=18:lang=ja");
+    char *f_math     = match_description("DejaVu Sans:size=24");
 
     markup_t normal = {
         .family  = f_normal,
@@ -241,22 +154,155 @@ int main( int argc, char **argv )
 
     vec2 pen = {{20, 200}};
     text_buffer_printf( buffer, &pen,
-                        &underline, L"The",
-                        &normal,    L" Quick",
-                        &big,       L" brown ",
-                        &reverse,   L" fox \n",
-                        &italic,    L"jumps over ",
-                        &bold,      L"the lazy ",
-                        &normal,    L"dog.\n",
-                        &small,     L"Now is the time for all good men "
-                                    L"to come to the aid of the party.\n",
-                        &italic,    L"Ég get etið gler án þess að meiða mig.\n",
-                        &japanese,  L"私はガラスを食べられます。 それは私を傷つけません\n",
-                        &math,      L"ℕ ⊆ ℤ ⊂ ℚ ⊂ ℝ ⊂ ℂ",
+                        &underline, "The",
+                        &normal,    " Quick",
+                        &big,       " brown ",
+                        &reverse,   " fox \n",
+                        &italic,    "jumps over ",
+                        &bold,      "the lazy ",
+                        &normal,    "dog.\n",
+                        &small,     "Now is the time for all good men "
+                                    "to come to the aid of the party.\n",
+                        &italic,    "Ég get etið gler án þess að meiða mig.\n",
+                        &japanese,  "私はガラスを食べられます。 それは私を傷つけません\n",
+                        &math,      "ℕ ⊆ ℤ ⊂ ℚ ⊂ ℝ ⊂ ℂ",
                         NULL );
+
+    texture_atlas_upload( buffer->manager->atlas );
+
+    text_buffer_align( buffer, &pen, ALIGN_CENTER );
+
+    vec4 bounds = text_buffer_get_bounds( buffer, &pen );
+    float left = bounds.left;
+    float right = bounds.left + bounds.width;
+    float top = bounds.top;
+    float bottom = bounds.top - bounds.height;
+
+    shader = shader_load("shaders/v3f-c4f.vert",
+                         "shaders/v3f-c4f.frag");
+
+    lines_buffer = vertex_buffer_new( "vertex:3f,color:4f" );
+    vertex_t vertices[] = { { left - 10,         top, 0, 0,0,0,1}, // top
+                            {right + 10,         top, 0, 0,0,0,1},
+
+                            { left - 10,      bottom, 0, 0,0,0,1}, // bottom
+                            {right + 10,      bottom, 0, 0,0,0,1},
+
+                            {      left,    top + 10, 0, 0,0,0,1}, // left
+                            {      left, bottom - 10, 0, 0,0,0,1},
+                            {     right,    top + 10, 0, 0,0,0,1}, // right
+                            {     right, bottom - 10, 0, 0,0,0,1} };
+    GLuint indices[] = { 0,1,2,3,4,5,6,7 };
+    vertex_buffer_push_back( lines_buffer, vertices, 8, indices, 8);
+
     mat4_set_identity( &projection );
     mat4_set_identity( &model );
     mat4_set_identity( &view );
+}
+
+
+// ---------------------------------------------------------------- display ---
+void display( GLFWwindow* window )
+{
+    glClearColor(0.40,0.40,0.45,1.00);
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+    glColor4f(1.00,1.00,1.00,1.00);
+    glUseProgram( buffer->shader );
+    {
+        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "model" ),
+                            1, 0, model.data);
+        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "view" ),
+                            1, 0, view.data);
+        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "projection" ),
+                            1, 0, projection.data);
+        text_buffer_render( buffer );
+    }
+
+    glBlendFunc( GL_ONE, GL_ONE_MINUS_SRC_ALPHA );
+    glBlendColor( 1.0, 1.0, 1.0, 1.0 );
+    glUseProgram( shader );
+    {
+        glUniformMatrix4fv( glGetUniformLocation( shader, "model" ),
+                            1, 0, model.data);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "view" ),
+                            1, 0, view.data);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "projection" ),
+                            1, 0, projection.data);
+        vertex_buffer_render( lines_buffer, GL_LINES );
+    }
+    
+    glfwSwapBuffers( window );
+}
+
+
+// ---------------------------------------------------------------- reshape ---
+void reshape( GLFWwindow* window, int width, int height )
+{
+    glViewport(0, 0, width, height);
+    mat4_set_orthographic( &projection, 0, width, 0, height, -1, 1);
+}
+
+
+// --------------------------------------------------------------- keyboard ---
+void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
+{
+    if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
+    {
+        glfwSetWindowShouldClose( window, GL_TRUE );
+    }
+}
+
+
+// --------------------------------------------------------- error-callback ---
+void error_callback( int error, const char* description )
+{
+    fputs( description, stderr );
+}
+
+
+// ------------------------------------------------------------------- main ---
+int main( int argc, char **argv )
+{
+    GLFWwindow* window;
+
+    glfwSetErrorCallback( error_callback );
+
+    if (!glfwInit( ))
+    {
+        exit( EXIT_FAILURE );
+    }
+
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
+    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
+
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
+
+    if (!window)
+    {
+        glfwTerminate( );
+        exit( EXIT_FAILURE );
+    }
+
+    glfwMakeContextCurrent( window );
+    glfwSwapInterval( 1 );
+
+    glfwSetFramebufferSizeCallback( window, reshape );
+    glfwSetWindowRefreshCallback( window, display );
+    glfwSetKeyCallback( window, keyboard );
+
+#ifndef __APPLE__
+    GLenum err = glewInit();
+    if (GLEW_OK != err)
+    {
+        /* Problem: glewInit failed, something is seriously wrong. */
+        fprintf( stderr, "Error: %s\n", glewGetErrorString(err) );
+        exit( EXIT_FAILURE );
+    }
+    fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
+#endif
+
+    init();
 
     glfwSetWindowSize( window, 500, 220 );
     glfwShowWindow( window );
@@ -270,5 +316,5 @@ int main( int argc, char **argv )
     glfwDestroyWindow( window );
     glfwTerminate( );
 
-    return 0;
+    return EXIT_SUCCESS;
 }

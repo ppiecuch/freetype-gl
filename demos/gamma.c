@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -37,7 +37,6 @@
  */
 #include <stdarg.h>
 #include <stdio.h>
-#include <wchar.h>
 
 #include "freetype-gl.h"
 #include "vertex-buffer.h"
@@ -60,6 +59,72 @@ text_buffer_t *buffer;
 vertex_buffer_t *background;
 GLuint shader;
 mat4 model, view, projection;
+
+
+// ------------------------------------------------------------------- init ---
+void init( void )
+{
+    buffer = text_buffer_new( LCD_FILTERING_OFF,
+                              "shaders/text.vert",
+                              "shaders/text.frag" );
+    vec4 white = {{1.0, 1.0, 1.0, 1.0}};
+    vec4 black = {{0.0, 0.0, 0.0, 1.0}};
+    vec4 none  = {{1.0, 1.0, 1.0, 0.0}};
+
+    markup_t markup;
+    markup.family  = "fonts/Vera.ttf";
+    markup.size    = 15.0;
+    markup.bold    = 0;
+    markup.italic  = 0;
+    markup.rise    = 0.0;
+    markup.spacing = 0.0;
+    markup.gamma   = 1.0;
+    markup.foreground_color    = white;
+    markup.background_color    = none;
+    markup.underline           = 0;
+    markup.underline_color     = none;
+    markup.overline            = 0;
+    markup.overline_color      = none;
+    markup.strikethrough       = 0;
+    markup.strikethrough_color = none;
+    markup.font = 0;
+
+    size_t i;
+    vec2 pen;
+    pen.x = 32;
+    pen.y = 508;
+
+    char *text = "A Quick Brown Fox Jumps Over The Lazy Dog 0123456789\n";
+    for( i=0; i < 14; ++i )
+    {
+        markup.gamma = 0.75 + 1.5*i*(1.0/14);
+        text_buffer_add_text( buffer, &pen, &markup, text, 0 );
+        texture_atlas_upload( markup.font->atlas );
+    }
+    pen.x = 32;
+    pen.y = 252;
+    markup.foreground_color = black;
+    for( i=0; i < 14; ++i )
+    {
+        markup.gamma = 0.75 + 1.5*i*(1.0/14);
+        text_buffer_add_text( buffer, &pen, &markup, text, 0 );
+        texture_atlas_upload( markup.font->atlas );
+    }
+
+    background = vertex_buffer_new( "vertex:3f,color:4f" );
+    vertex_t vertices[4*2] = { {  0,  0,0, 1,1,1,1}, {  0,256,0, 1,1,1,1},
+                               {512,256,0, 1,1,1,1}, {512,  0,0, 1,1,1,1},
+                               {0,  256,0, 0,0,0,1}, {  0,512,0, 0,0,0,1},
+                               {512,512,0, 0,0,0,1}, {512,256,0, 0,0,0,1} };
+    GLuint indices[4*3] = { 0,1,2, 0,2,3, 4,5,6, 4,6,7 };
+    vertex_buffer_push_back( background, vertices, 8, indices, 12 );
+    shader = shader_load("shaders/v3f-c4f.vert",
+                         "shaders/v3f-c4f.frag");
+
+    mat4_set_identity( &projection );
+    mat4_set_identity( &model );
+    mat4_set_identity( &view );
+}
 
 
 // ---------------------------------------------------------------- display ---
@@ -111,11 +176,13 @@ void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
     }
 }
 
-/* -------------------------------------------------------- error-callback - */
+
+// --------------------------------------------------------- error-callback ---
 void error_callback( int error, const char* description )
 {
     fputs( description, stderr );
 }
+
 
 // ------------------------------------------------------------------- main ---
 int main( int argc, char **argv )
@@ -129,7 +196,7 @@ int main( int argc, char **argv )
         exit( EXIT_FAILURE );
     }
 
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
 
     window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
@@ -158,61 +225,8 @@ int main( int argc, char **argv )
     }
     fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 #endif
-    buffer = text_buffer_new( LCD_FILTERING_OFF );
-    vec4 white = {{1.0, 1.0, 1.0, 1.0}};
-    vec4 black = {{0.0, 0.0, 0.0, 1.0}};
-    vec4 none  = {{1.0, 1.0, 1.0, 0.0}};
-    markup_t markup;
-    markup.family  = "fonts/Vera.ttf";
-    markup.size    = 15.0;
-    markup.bold    = 0;
-    markup.italic  = 0;
-    markup.rise    = 0.0;
-    markup.spacing = 0.0;
-    markup.gamma   = 1.0;
-    markup.foreground_color    = white;
-    markup.background_color    = none;
-    markup.underline           = 0;
-    markup.underline_color     = none;
-    markup.overline            = 0;
-    markup.overline_color      = none;
-    markup.strikethrough       = 0;
-    markup.strikethrough_color = none;
-    markup.font = 0;
 
-    size_t i;
-    vec2 pen;
-    pen.x = 32;
-    pen.y = 508;
-
-    wchar_t *text = L"A Quick Brown Fox Jumps Over The Lazy Dog 0123456789\n";
-    for( i=0; i < 14; ++i )
-    {
-        markup.gamma = 0.75 + 1.5*i*(1.0/14);
-        text_buffer_add_text( buffer, &pen, &markup, text, wcslen(text) );
-    }
-    pen.x = 32;
-    pen.y = 252;
-    markup.foreground_color = black;
-    for( i=0; i < 14; ++i )
-    {
-        markup.gamma = 0.75 + 1.5*i*(1.0/14);
-        text_buffer_add_text( buffer, &pen, &markup, text, wcslen(text) );
-    }
-
-    background = vertex_buffer_new( "vertex:3f,color:4f" );
-    vertex_t vertices[4*2] = { {  0,  0,0, 1,1,1,1}, {  0,256,0, 1,1,1,1},
-                               {512,256,0, 1,1,1,1}, {512,  0,0, 1,1,1,1},
-                               {0,  256,0, 0,0,0,1}, {  0,512,0, 0,0,0,1},
-                               {512,512,0, 0,0,0,1}, {512,256,0, 0,0,0,1} };
-    GLuint indices[4*3] = { 0,1,2, 0,2,3, 4,5,6, 4,6,7 };
-    vertex_buffer_push_back( background, vertices, 8, indices, 12 );
-    shader = shader_load("shaders/v3f-c4f.vert",
-                         "shaders/v3f-c4f.frag");
-
-    mat4_set_identity( &projection );
-    mat4_set_identity( &model );
-    mat4_set_identity( &view );
+    init();
 
     glfwSetWindowSize( window, 512, 512 );
     glfwShowWindow( window );
@@ -226,5 +240,5 @@ int main( int argc, char **argv )
     glfwDestroyWindow( window );
     glfwTerminate( );
 
-    return 0;
+    return EXIT_SUCCESS;
 }

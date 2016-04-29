@@ -1,7 +1,7 @@
 /* =========================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * -------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -182,7 +182,9 @@ typedef struct markup_t
 
 } markup_t;
 
-
+/**
+  * Default markup
+  */
 extern markup_t default_markup;
 
 

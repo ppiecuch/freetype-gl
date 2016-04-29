@@ -1,9 +1,9 @@
-/* =========================================================================
+/* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
- * -------------------------------------------------------------------------
- * Copyright 2011 Nicolas P. Rougier. All rights reserved.
+ * WWW:         https://github.com/rougier/freetype-gl
+ * ----------------------------------------------------------------------------
+ * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,17 +29,21 @@
  * The views and conclusions contained in the software and documentation are
  * those of the authors and should not be interpreted as representing official
  * policies, either expressed or implied, of Nicolas P. Rougier.
- * ========================================================================= */
+ * ============================================================================
+ */
 #include <stdio.h>
 #include <string.h>
+
 #include "freetype-gl.h"
-#include "edtaa3func.h"
+#include "distance-field.h"
 #include "vertex-buffer.h"
 #include "text-buffer.h"
 #include "markup.h"
 #include "shader.h"
+#include "mat4.h"
 
 #include <GLFW/glfw3.h>
+
 
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -52,22 +56,66 @@
 
 // ------------------------------------------------------- typedef & struct ---
 typedef struct {
+    float x, y, z;    // position
+    float s, t;       // texture
+    float r, g, b, a; // color
+} vertex_t;
+
+typedef struct {
     float x, y, zoom;
 } viewport_t;
 
+
 // ------------------------------------------------------- global variables ---
+GLuint shader;
+vertex_buffer_t *buffer;
 texture_atlas_t * atlas = 0;
+mat4  model, view, projection;
 viewport_t viewport = {0,0,1};
-GLuint program = 0;
+
+
+// ------------------------------------------------------------------- init ---
+void init( void )
+{
+    unsigned char *map;
+    texture_font_t * font;
+    const char *filename = "fonts/Vera.ttf";
+    const char * cache = " !\"#$%&'()*+,-./0123456789:;<=>?"
+                         "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
+                         "`abcdefghijklmnopqrstuvwxyz{|}~";
+
+    atlas = texture_atlas_new( 512, 512, 1 );
+    font = texture_font_new_from_file( atlas, 72, filename );
+    texture_font_load_glyphs( font, cache );
+    texture_font_delete( font );
+
+    fprintf( stderr, "Generating distance map...\n" );
+    map = make_distance_mapb(atlas->data, atlas->width, atlas->height);
+    fprintf( stderr, "done !\n");
+
+    memcpy( atlas->data, map, atlas->width*atlas->height*sizeof(unsigned char) );
+    free(map);
+    texture_atlas_upload( atlas );
+
+    GLuint indices[6] = {0,1,2, 0,2,3};
+    vertex_t vertices[4] = { { 0,0,0,  0,1,  1,1,1,1 },
+                             { 0,1,0,  0,0,  1,1,1,1 },
+                             { 1,1,0,  1,0,  1,1,1,1 },
+                             { 1,0,0,  1,1,  1,1,1,1 } };
+    buffer = vertex_buffer_new( "vertex:3f,tex_coord:2f,color:4f" );
+    vertex_buffer_push_back( buffer, vertices, 4, indices, 6 );
+
+    shader = shader_load( "shaders/distance-field.vert",
+                           "shaders/distance-field.frag" );
+    mat4_set_identity( &projection );
+    mat4_set_identity( &model );
+    mat4_set_identity( &view );
+}
 
 
 // ---------------------------------------------------------------- display ---
 void display( GLFWwindow* window )
 {
-    int v[4];
-    glGetIntegerv( GL_VIEWPORT, v );
-    GLuint width  = v[2];
-    GLuint height = v[3];
     glClearColor(0.5,0.5,0.5,1.00);
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
@@ -77,25 +125,33 @@ void display( GLFWwindow* window )
     glEnable( GL_BLEND );
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
-    GLuint handle;
-    handle = glGetUniformLocation( program, "texture" );
-    glUniform1i( handle, 0);
+    GLint v[4];
+    glGetIntegerv( GL_VIEWPORT, v );
+    GLint width  = v[2];
+    GLint height = v[3];
 
-    int x = viewport.x;
-    int y = viewport.y;
-    width *= viewport.zoom;
-    height *= viewport.zoom;
+    vec4 color = {{1.0, 1.0, 1.0, 1.0 }};
 
-    glColor4f( 1.0, 1.0, 1.0, 1.0 );
-    glPushMatrix();
-    glBegin(GL_QUADS);
-    glTexCoord2f( 0, 1 ); glVertex2i( x, y );
-    glTexCoord2f( 0, 0 ); glVertex2i( x, y+height );
-    glTexCoord2f( 1, 0 ); glVertex2i( x+width, y+height );
-    glTexCoord2f( 1, 1 ); glVertex2i( x+width, y );
-    glEnd();
+    mat4_set_identity( &model );
+    mat4_scale( &model, width * viewport.zoom, height * viewport.zoom, 0 );
+    mat4_translate( &model, viewport.x, viewport.y, 0);
 
-    glPopMatrix();
+    glUseProgram( shader );
+    {
+        glUniform1i( glGetUniformLocation( shader, "u_texture" ),
+                     0);
+        glUniform4f( glGetUniformLocation( shader, "u_color" ),
+                     color.r, color.g, color.b, color.a);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "u_model" ),
+                            1, 0, model.data);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "u_view" ),
+                            1, 0, view.data);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "u_projection" ),
+                            1, 0, projection.data);
+
+        vertex_buffer_render( buffer, GL_TRIANGLES );
+    }
+
     glfwSwapBuffers( window );
 }
 
@@ -138,10 +194,7 @@ void cursor_motion( GLFWwindow* window, double x, double y )
 void reshape( GLFWwindow* window, int width, int height )
 {
     glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
+    mat4_set_orthographic( &projection, 0, width, 0, height, -1, 1);
 }
 
 
@@ -155,78 +208,7 @@ void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
 }
 
 
-// ------------------------------------------------------ make_distance_map ---
-unsigned char *
-make_distance_map( unsigned char *img,
-                   unsigned int width, unsigned int height )
-{
-    short * xdist = (short *)  malloc( width * height * sizeof(short) );
-    short * ydist = (short *)  malloc( width * height * sizeof(short) );
-    double * gx   = (double *) calloc( width * height, sizeof(double) );
-    double * gy      = (double *) calloc( width * height, sizeof(double) );
-    double * data    = (double *) calloc( width * height, sizeof(double) );
-    double * outside = (double *) calloc( width * height, sizeof(double) );
-    double * inside  = (double *) calloc( width * height, sizeof(double) );
-    int i;
-
-    // Convert img into double (data)
-    double img_min = 255, img_max = -255;
-    for( i=0; i<width*height; ++i)
-    {
-        double v = img[i];
-        data[i] = v;
-        if (v > img_max) img_max = v;
-        if (v < img_min) img_min = v;
-    }
-    // Rescale image levels between 0 and 1
-    for( i=0; i<width*height; ++i)
-    {
-        data[i] = (img[i]-img_min)/img_max;
-    }
-
-    // Compute outside = edtaa3(bitmap); % Transform background (0's)
-    computegradient( data, width, height, gx, gy);
-    edtaa3(data, gx, gy, width, height, xdist, ydist, outside);
-    for( i=0; i<width*height; ++i)
-        if( outside[i] < 0 )
-            outside[i] = 0.0;
-
-    // Compute inside = edtaa3(1-bitmap); % Transform foreground (1's)
-    memset(gx, 0, sizeof(double)*width*height );
-    memset(gy, 0, sizeof(double)*width*height );
-    for( i=0; i<width*height; ++i)
-        data[i] = 1 - data[i];
-    computegradient( data, width, height, gx, gy);
-    edtaa3(data, gx, gy, width, height, xdist, ydist, inside);
-    for( i=0; i<width*height; ++i)
-        if( inside[i] < 0 )
-            inside[i] = 0.0;
-
-    // distmap = outside - inside; % Bipolar distance field
-    unsigned char *out = (unsigned char *) malloc( width * height * sizeof(unsigned char) );
-    for( i=0; i<width*height; ++i)
-    {
-        outside[i] -= inside[i];
-        outside[i] = 128+outside[i]*16;
-        if( outside[i] < 0 ) outside[i] = 0;
-        if( outside[i] > 255 ) outside[i] = 255;
-        out[i] = 255 - (unsigned char) outside[i];
-        //out[i] = (unsigned char) outside[i];
-    }
-
-    free( xdist );
-    free( ydist );
-    free( gx );
-    free( gy );
-    free( data );
-    free( outside );
-    free( inside );
-    return out;
-}
-
-
-
-/* -------------------------------------------------------- error-callback - */
+// --------------------------------------------------------- error-callback ---
 void error_callback( int error, const char* description )
 {
     fputs( description, stderr );
@@ -245,10 +227,10 @@ int main( int argc, char **argv )
         exit( EXIT_FAILURE );
     }
 
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
 
-    window = glfwCreateWindow( 1, 1, "Freetype OpenGL width shaders", NULL, NULL );
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
 
     if (!window)
     {
@@ -276,30 +258,7 @@ int main( int argc, char **argv )
     fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 #endif
 
-    unsigned char *map;
-    texture_font_t * font;
-    const char *filename = "fonts/Vera.ttf";
-    const wchar_t *cache = L" !\"#$%&'()*+,-./0123456789:;<=>?"
-                           L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
-                           L"`abcdefghijklmnopqrstuvwxyz{|}~";
-
-    atlas = texture_atlas_new( 512, 512, 1 );
-    font = texture_font_new_from_file( atlas, 72, filename );
-    texture_font_load_glyphs( font, cache );
-    texture_font_delete( font );
-
-    fprintf( stderr, "Generating distance map...\n" );
-    map = make_distance_map(atlas->data, atlas->width, atlas->height);
-    fprintf( stderr, "done !\n");
-
-    memcpy( atlas->data, map, atlas->width*atlas->height*sizeof(unsigned char) );
-    free(map);
-    texture_atlas_upload( atlas );
-
-    // Create the GLSL program
-    program = shader_load( "shaders/distance-field.vert",
-                           "shaders/distance-field.frag" );
-    glUseProgram( program );
+    init();
 
     glfwSetWindowSize( window, 512, 512 );
     glfwShowWindow( window );
@@ -313,5 +272,5 @@ int main( int argc, char **argv )
     glfwDestroyWindow( window );
     glfwTerminate( );
 
-    return 0;
+    return EXIT_SUCCESS;
 }

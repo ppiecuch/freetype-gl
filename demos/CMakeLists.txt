@@ -1,7 +1,7 @@
 # =========================================================================
 # Freetype GL - A C OpenGL Freetype engine
 # Platform:    Any
-# WWW:         http://code.google.com/p/freetype-gl/
+# WWW:         https://github.com/rougier/freetype-gl
 # -------------------------------------------------------------------------
 # Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
 #
@@ -30,111 +30,108 @@
 # those of the authors and should not be interpreted as representing official
 # policies, either expressed or implied, of Nicolas P. Rougier.
 # =========================================================================
-CMAKE_MINIMUM_REQUIRED( VERSION 2.8.5 )
+cmake_minimum_required(VERSION 2.8.5)
 
-# Get required and optional library
-IF( WIN32 OR WIN64 )
-    SET( WINDOWS_DIR
-         ${CMAKE_CURRENT_SOURCE_DIR}/../windows )
-    SET( ANT_TWEAK_BAR_INCLUDE_PATH
-         ${CMAKE_CURRENT_SOURCE_DIR}/../windows/AntTweakBar/include )
-    SET( ANT_TWEAK_BAR_LIBRARY
-         ${CMAKE_CURRENT_SOURCE_DIR}/../windows/AntTweakBar/lib/AntTweakBar.lib )
-    SET( ANT_TWEAK_BAR_FOUND "YES" )
-ELSE( WIN32 OR WIN64 )
-    FIND_PACKAGE( FontConfig )
-    #FIND_LIBRARY( STDC_LIBRARY stdc++) #Buggy Cmake can't find libstdc++
-    FIND_PACKAGE( AntTweakBar )
-ENDIF( WIN32 OR WIN64 )
-
-MACRO( DEMO _target _sources)
-     add_executable(${_target} ${_sources})
-     include_directories(${WINDOWS_DIR} ${GLFW3_INCLUDE_DIR} ${GLEW_INCLUDE_PATH} ${FREETYPE_INCLUDE_DIR_ft2build} ${FREETYPE_INCLUDE_DIR_freetype2} ${ANT_TWEAK_BAR_INCLUDE_PATH})
+macro(CREATE_DEMO _target _sources)
+    add_executable(${_target} ${_sources})
     if(NOT APPLE)
-     target_link_libraries(${_target} ${GLEW_LIBRARY})
+        target_link_libraries(${_target} ${GLEW_LIBRARY})
     endif()
-     target_link_libraries(${_target} freetype-gl)
-     target_link_libraries(${_target} ${OPENGL_LIBRARY})
-     target_link_libraries(${_target} ${GLFW3_LIBRARY})
-     target_link_libraries(${_target} ${FREETYPE_LIBRARY})
-     IF( MATH_LIBRARY )
-         target_link_libraries(${_target} ${MATH_LIBRARY})
-     ENDIF( MATH_LIBRARY )
-    if(MSVC)
-      # Compile demos as C++
-      set_source_files_properties(${_sources} PROPERTIES LANGUAGE CXX)
+    target_link_libraries(${_target}
+        freetype-gl
+        ${OPENGL_LIBRARY}
+        ${GLFW3_LIBRARY}
+        ${FREETYPE_LIBRARIES}
+    )
+    if(MATH_LIBRARY)
+        target_link_libraries(${_target} ${MATH_LIBRARY})
     endif()
-ENDMACRO( DEMO )
+     
+    if(MSVC AND NOT (MSVC_VERSION LESS 1900))
+        # prevent error LNK2019: unresolved external symbol _sprintf referenced in function __bdf_parse_properties
+        # see http://stackoverflow.com/a/32418900/469659
+        target_link_libraries(${_target} "legacy_stdio_definitions.lib")
+    endif()
+endmacro()
 
-ADD_CUSTOM_COMMAND(
+if(WIN32 OR WIN64)
+    set(ENV{ANT_TWEAK_BAR_ROOT}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../windows/AntTweakBar
+    )
+endif()
+
+# Find dependencies
+find_package(glfw3 REQUIRED)
+find_package(AntTweakBar)
+find_package(FontConfig)
+
+include_directories(
+    ${GLFW3_INCLUDE_DIR}
+    ${ANT_TWEAK_BAR_INCLUDE_PATH}
+    ${FONTCONFIG_INCLUDE_DIR}
+)
+
+link_directories(
+    ${GLFW3_LIBRARY_DIR}
+)
+
+add_custom_command(
     DEPENDS
         makefont
         ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
     COMMAND
-        ../makefont
+        ../$<$<BOOL:MSVC>:$(Configuration)/>makefont
     ARGS
         --font fonts/Vera.ttf
         --header ${CMAKE_CURRENT_SOURCE_DIR}/vera-16.h
         --size 16
         --variable font
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/vera-16.h)
-ADD_CUSTOM_TARGET(generate-embedded-font
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vera-16.h)
-DEMO( embedded-font    "embedded-font.c" )
-ADD_DEPENDENCIES(embedded-font generate-embedded-font)
+    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/vera-16.h
+)
 
-DEMO( texture          "texture.c" )
-DEMO( font             "font.c" )
-DEMO( benchmark        "benchmark.c" )
-DEMO( console          "console.c" )
-DEMO( cube             "cube.c" )
-DEMO( glyph            "glyph.c" )
-DEMO( cartoon          "cartoon.c" )
-DEMO( outline          "outline.c" )
-DEMO( lcd              "lcd.c" )
-DEMO( gamma            "gamma.c" )
-DEMO( ansi             "ansi.c" )
-DEMO( subpixel         "subpixel.c" )
-DEMO( distance-field   "distance-field.c")
-DEMO( distance-field-2 "distance-field-2.c")
-DEMO( distance-field-3 "distance-field-3.c")
+add_custom_target(generate-embedded-font
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vera-16.h
+)
 
-IF (FONTCONFIG_FOUND)
-   INCLUDE_DIRECTORIES( ${FONTCONFIG_INCLUDE_DIR} )
-   DEMO( markup      "markup.c" )
+create_demo(embedded-font embedded-font.c)
+add_dependencies(embedded-font generate-embedded-font)
+
+create_demo(texture texture.c)
+create_demo(font font.c)
+create_demo(benchmark benchmark.c)
+create_demo(console console.c)
+create_demo(cube cube.c)
+create_demo(glyph glyph.c)
+create_demo(cartoon cartoon.c)
+create_demo(outline outline.c)
+create_demo(lcd lcd.c)
+create_demo(gamma gamma.c)
+create_demo(ansi ansi.c)
+create_demo(subpixel subpixel.c)
+create_demo(distance-field distance-field.c)
+create_demo(distance-field-2 distance-field-2.c)
+create_demo(distance-field-3 distance-field-3.c)
+
+if(FONTCONFIG_FOUND)
+   create_demo(markup markup.c)
    target_link_libraries(markup ${FONTCONFIG_LIBRARY})
-ENDIF (FONTCONFIG_FOUND)
+endif()
 
-IF (ANT_TWEAK_BAR_FOUND AND (NOT (WIN32 OR WIN64)) )
- #DEMO( atb-agg     "atb-agg.c;markup.h;")
- FILE(WRITE ${CMAKE_SOURCE_DIR}/stdc_test.c
-  "int main(void){return 0;}\n")
-  EXECUTE_PROCESS(COMMAND ${CMAKE_C_COMPILER} -lstdc++ OUTPUT_VARIABLE out_res ERROR_VARIABLE err_res)
-  string(FIND VAL"${err_res}" "main" substr_index )
-  if(${substr_index} STRGREATER "0")
-      message (STATUS "Found Libstdc++ needed by atb-agg.c ." )
-
-      add_executable(atb-agg  atb-agg.c)
-      target_link_libraries( atb-agg freetype-gl)
-      target_link_libraries( atb-agg ${GLFW3_LIBRARY})
-      target_link_libraries( atb-agg ${GLEW_LIBRARY})
-      target_link_libraries( atb-agg ${FREETYPE_LIBRARY})
-      target_link_libraries( atb-agg ${ANT_TWEAK_BAR_LIBRARY})
-      # target_link_libraries( atb-agg ${STDC_LIBRARY}) # Buggy Cmake can't find libstdc++
-      # quirk: because of link order libstdc++ must be linked before libGLU
-      target_link_libraries( atb-agg "-lstdc++")
-      target_link_libraries( atb-agg ${OPENGL_LIBRARY})
-      IF(MATH_LIBRARY)
-        target_link_libraries( atb-agg ${MATH_LIBRARY})
-      ENDIF(MATH_LIBRARY)
-  else()
-      message (STATUS "NOT FOUND: Libstdc++ is not installed. It is needed by atb-agg.c" )
-  endif()
-  FILE(REMOVE ${CMAKE_SOURCE_DIR}/stdc_test.c)
-ENDIF (ANT_TWEAK_BAR_FOUND AND (NOT (WIN32 OR WIN64)) )
+if(ANT_TWEAK_BAR_FOUND)
+    create_demo(atb-agg atb-agg.c)
+    target_link_libraries(atb-agg ${ANT_TWEAK_BAR_LIBRARY})
+endif()
 
 # Copy font and shaders into build directory for in-place testing
 file(COPY ../fonts DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ../data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ../shaders DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+if(MSVC)
+    foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        file(COPY ../fonts DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${config})
+        file(COPY ../data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${config})
+        file(COPY ../shaders DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${config})
+    endforeach()
+endif()

@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -34,6 +34,8 @@
 #ifndef __TEXTURE_FONT_H__
 #define __TEXTURE_FONT_H__
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +47,10 @@ extern "C" {
 #include <hb-ft.h>
 #include "vector.h"
 #include "texture-atlas.h"
+
+#ifdef __cplusplus
+namespace ftgl {
+#endif
 
 /**
  * @file   texture-font.h
@@ -73,9 +79,9 @@ extern "C" {
 typedef struct texture_glyph_t
 {
     /**
-     * Wide character this glyph represents
+     * Unicode codepoint this glyph represents in UTF-32 LE encoding.
      */
-    size_t codepoint;
+    uint32_t codepoint;
 
     /**
      * Glyph's width in pixels.
@@ -119,6 +125,17 @@ typedef struct texture_glyph_t
      * Second normalized texture coordinate (y) of bottom-right corner
      */
     float t1;
+
+    /**
+     * Glyph outline type (0 = None, 1 = line, 2 = inner, 3 = outer)
+     */
+    int outline_type;
+
+    /**
+     * Glyph outline thickness
+     */
+    float outline_thickness;
+
 } texture_glyph_t;
 
 
@@ -170,6 +187,31 @@ typedef struct texture_font_t
      * Font hres (vertical hinting trick
      */
     float hres;
+
+    /**
+     * Whether to use autohint when rendering font
+     */
+    int hinting;
+
+    /**
+     * Outline type (0 = None, 1 = line, 2 = inner, 3 = outer)
+     */
+    int outline_type;
+
+    /**
+     * Outline thickness
+     */
+    float outline_thickness;
+
+    /**
+     * Whether to use our own lcd filter.
+     */
+    int filtering;
+
+    /**
+     * LCD filter weights
+     */
+    unsigned char lcd_weights[5];
 
     /**
      * Freetype face
@@ -255,6 +297,27 @@ typedef struct texture_font_t
 
 
 /**
+ * This function creates a new texture font from a memory location and size.
+ * The texture atlas is used to store glyph on demand. Note the depth of the
+ * atlas will determine if the font is rendered as alpha channel only
+ * (depth = 1) or RGB (depth = 3) that correspond to subpixel rendering (if
+ * available on your freetype implementation).
+ *
+ * @param atlas       A texture atlas
+ * @param pt_size     Size of font to be created (in points)
+ * @param memory_base Start of the font file in memory
+ * @param memory_size Size of the font file memory region, in bytes
+ *
+ * @return A new empty font (no glyph inside yet)
+ *
+ */
+  texture_font_t *
+  texture_font_new_from_memory( texture_atlas_t *atlas,
+                                float pt_size,
+                                const void *memory_base,
+                                size_t memory_size );
+
+/**
  * Delete a texture font. Note that this does not delete the glyph from the
  * texture atlas.
  *
@@ -268,8 +331,8 @@ typedef struct texture_font_t
  * Request a new glyph from the font. If it has not been created yet, it will
  * be.
  *
- * @param self     A valid texture font
- * @param charcode Character codepoint to be loaded.
+ * @param self      A valid texture font
+ * @param codepoint Character codepoint to be loaded in UTF-32 LE encoding.
  *
  * @return A pointer on the new glyph or 0 if the texture atlas is not big
  *         enough
@@ -277,24 +340,23 @@ typedef struct texture_font_t
  */
   texture_glyph_t *
   texture_font_get_glyph( texture_font_t * self,
-                          size_t codepoint );
+                          uint32_t codepoint );
 
 
 /**
  * Request the loading of several glyphs at once.
  *
- * @param self      a valid texture font
- * @param charcodes character codepoints to be loaded.
+ * @param self       A valid texture font
+ * @param codepoints Character codepoints to be loaded in UTF-8 encoding. May
+ *                   contain duplicates.
  *
  * @return Number of missed glyph if the texture is not big enough to hold
  *         every glyphs.
  */
-  void
+  size_t
   texture_font_load_glyphs( texture_font_t * self,
-                            const char *text,
-                            const hb_direction_t directions,
-                            const char *language,
-                            const hb_script_t script );
+                            const char * codepoints,
+                            const char *language );
 
 /**
  * Creates a new empty glyph
@@ -309,7 +371,7 @@ texture_glyph_new( void );
 
 #ifdef __cplusplus
 }
+}
 #endif
 
 #endif /* __TEXTURE_FONT_H__ */
-

@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -32,7 +32,7 @@
  * ============================================================================
  */
 #include <stdio.h>
-#include <wchar.h>
+#include <string.h>
 #include "freetype-gl.h"
 #include "vertex-buffer.h"
 #include "shader.h"
@@ -53,9 +53,9 @@ typedef struct {
 texture_atlas_t * atlas;
 texture_font_t * font;
 vertex_buffer_t * buffer;
-wchar_t *text =
-    L"A Quick Brown Fox Jumps Over The Lazy Dog 0123456789 "
-    L"A Quick Brown Fox Jumps Over The Lazy Dog 0123456789 ";
+char *text =
+    "A Quick Brown Fox Jumps Over The Lazy Dog 0123456789 "
+    "A Quick Brown Fox Jumps Over The Lazy Dog 0123456789 ";
 int line_count = 42;
 GLuint shader;
 mat4   model, view, projection;
@@ -63,19 +63,19 @@ mat4   model, view, projection;
 
 // --------------------------------------------------------------- add_text ---
 void add_text( vertex_buffer_t * buffer, texture_font_t * font,
-               wchar_t * text, vec4 * color, vec2 * pen )
+               char *text, vec4 * color, vec2 * pen )
 {
     size_t i;
     float r = color->red, g = color->green, b = color->blue, a = color->alpha;
-    for( i=0; i<wcslen(text); ++i )
+    for( i = 0; i < strlen(text); ++i )
     {
-        texture_glyph_t *glyph = texture_font_get_glyph( font, text[i] );
+        texture_glyph_t *glyph = texture_font_get_glyph( font, text + i );
         if( glyph != NULL )
         {
             float kerning = 0.0f;
             if( i > 0)
             {
-                kerning = texture_glyph_get_kerning( glyph, text[i-1] );
+                kerning = texture_glyph_get_kerning( glyph, text + i - 1 );
             }
             pen->x += kerning;
             int x0  = (int)( pen->x + glyph->offset_x );
@@ -101,6 +101,41 @@ void add_text( vertex_buffer_t * buffer, texture_font_t * font,
 }
 
 
+// ------------------------------------------------------------------- init ---
+void init( void )
+{
+    size_t i;
+    vec2 pen = {{0,0}};
+    vec4 color = {{0,0,0,1}};
+
+    atlas  = texture_atlas_new( 512, 512, 1 );
+    font = texture_font_new_from_file( atlas, 12, "fonts/VeraMono.ttf" );
+    buffer = vertex_buffer_new( "vertex:3f,tex_coord:2f,color:4f" );
+
+    pen.y = -font->descender;
+    for( i=0; i<line_count; ++i )
+    {
+        pen.x = 10.0;
+        add_text( buffer, font, text, &color, &pen );
+        pen.y += font->height - font->linegap;
+    }
+
+    texture_atlas_upload( atlas );
+
+    glClearColor( 1.0, 1.0, 1.0, 1.0 );
+    glDisable( GL_DEPTH_TEST );
+    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+    glEnable( GL_TEXTURE_2D );
+    glEnable( GL_BLEND );
+
+    shader = shader_load("shaders/v3f-t2f-c4f.vert",
+                         "shaders/v3f-t2f-c4f.frag");
+    mat4_set_identity( &projection );
+    mat4_set_identity( &model );
+    mat4_set_identity( &view );
+}
+
+
 // ---------------------------------------------------------------- display ---
 void display( GLFWwindow* window )
 {
@@ -113,24 +148,24 @@ void display( GLFWwindow* window )
         printf(
             "Computing FPS with text generation and rendering at each frame...\n" );
         printf(
-            "Number of glyphs: %d\n", (int)wcslen(text)*line_count );
+            "Number of glyphs: %d\n", (int)strlen(text)*line_count );
     }
 
-	frame++;
-	time = glfwGetTime( );
+    frame++;
+    time = glfwGetTime( );
 
     if( time > 2.5 )
     {
         printf( "FPS : %.2f (%d frames in %.2f second, %.1f glyph/second)\n",
                 frame/time, frame, time,
-                frame/time * wcslen(text)*line_count );
+                frame/time * strlen(text)*line_count );
         glfwSetTime( 0.0 );
         frame = 0;
         ++count;
         if( count == 5 )
         {
             printf( "\nComputing FPS with text rendering at each frame...\n" );
-            printf( "Number of glyphs: %d\n", (int)wcslen(text)*line_count );
+            printf( "Number of glyphs: %d\n", (int)strlen(text)*line_count );
         }
         if( count > 9 )
         {
@@ -190,7 +225,7 @@ void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
 }
 
 
-/* -------------------------------------------------------- error-callback - */
+// --------------------------------------------------------- error-callback ---
 void error_callback( int error, const char* description )
 {
     fputs( description, stderr );
@@ -200,9 +235,6 @@ void error_callback( int error, const char* description )
 // ------------------------------------------------------------------- main ---
 int main( int argc, char **argv )
 {
-    size_t i;
-    vec4 color = {{0,0,0,1}};
-    vec2 pen = {{0,0}};
     GLFWwindow* window;
 
     glfwSetErrorCallback( error_callback );
@@ -212,10 +244,10 @@ int main( int argc, char **argv )
         exit( EXIT_FAILURE );
     }
 
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
 
-    window = glfwCreateWindow( 1, 1, "Freetype OpenGL benchmark", NULL, NULL );
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
 
     if (!window)
     {
@@ -241,29 +273,8 @@ int main( int argc, char **argv )
     }
     fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 #endif
-    atlas  = texture_atlas_new( 512, 512, 1 );
-    font = texture_font_new_from_file( atlas, 12, "fonts/VeraMono.ttf" );
-    buffer = vertex_buffer_new( "vertex:3f,tex_coord:2f,color:4f" );
 
-    pen.y = -font->descender;
-    for( i=0; i<line_count; ++i )
-    {
-        pen.x = 10.0;
-        add_text( buffer, font, text, &color, &pen );
-        pen.y += font->height - font->linegap;
-    }
-
-    glClearColor( 1.0, 1.0, 1.0, 1.0 );
-    glDisable( GL_DEPTH_TEST );
-    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-    glEnable( GL_TEXTURE_2D );
-    glEnable( GL_BLEND );
-
-    shader = shader_load("shaders/v3f-t2f-c4f.vert",
-                         "shaders/v3f-t2f-c4f.frag");
-    mat4_set_identity( &projection );
-    mat4_set_identity( &model );
-    mat4_set_identity( &view );
+    init();
 
     glfwSetWindowSize( window, 800, 600 );
     glfwShowWindow( window );

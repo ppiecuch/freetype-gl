@@ -1,9 +1,9 @@
-/* =========================================================================
+/* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
- * -------------------------------------------------------------------------
- * Copyright 2011 Nicolas P. Rougier. All rights reserved.
+ * WWW:         https://github.com/rougier/freetype-gl
+ * ----------------------------------------------------------------------------
+ * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,17 +29,25 @@
  * The views and conclusions contained in the software and documentation are
  * those of the authors and should not be interpreted as representing official
  * policies, either expressed or implied, of Nicolas P. Rougier.
- * ========================================================================= */
+ * ============================================================================
+ */
+#include <math.h>
+
 #include "freetype-gl.h"
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include "edtaa3func.h"
+#include "distance-field.h"
+#include "vertex-buffer.h"
 #include "shader.h"
+#include "mat4.h"
 #include "texture-font.h"
 #include "texture-atlas.h"
 #include "platform.h"
+#include "utf8-utils.h"
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include <GLFW/glfw3.h>
+
 
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -50,76 +58,21 @@
 #endif
 
 
+// ------------------------------------------------------- typedef & struct ---
+typedef struct {
+    float x, y, z;    // position
+    float s, t;       // texture
+    float r, g, b, a; // color
+} vertex_t;
+
+
 // ------------------------------------------------------- global variables ---
 float angle = 0;
 GLuint program = 0;
+vertex_buffer_t *buffer;
 texture_font_t * font = 0;
 texture_atlas_t * atlas = 0;
-
-// ------------------------------------------------------ make_distance_map ---
-void
-distance_map( double *data, unsigned int width, unsigned int height )
-{
-    short * xdist = (short *)  malloc( width * height * sizeof(short) );
-    short * ydist = (short *)  malloc( width * height * sizeof(short) );
-    double * gx   = (double *) calloc( width * height, sizeof(double) );
-    double * gy      = (double *) calloc( width * height, sizeof(double) );
-    double * outside = (double *) calloc( width * height, sizeof(double) );
-    double * inside  = (double *) calloc( width * height, sizeof(double) );
-    int i;
-
-    // Compute outside = edtaa3(bitmap); % Transform background (0's)
-    computegradient( data, width, height, gx, gy);
-    edtaa3(data, gx, gy, width, height, xdist, ydist, outside);
-    for( i=0; i<width*height; ++i)
-    {
-        if( outside[i] < 0.0 )
-        {
-            outside[i] = 0.0;
-        }
-    }
-
-    // Compute inside = edtaa3(1-bitmap); % Transform foreground (1's)
-    memset( gx, 0, sizeof(double)*width*height );
-    memset( gy, 0, sizeof(double)*width*height );
-    for( i=0; i<width*height; ++i)
-        data[i] = 1 - data[i];
-    computegradient( data, width, height, gx, gy );
-    edtaa3( data, gx, gy, width, height, xdist, ydist, inside );
-    for( i=0; i<width*height; ++i )
-    {
-        if( inside[i] < 0 )
-        {
-            inside[i] = 0.0;
-        }
-    }
-
-    // distmap = outside - inside; % Bipolar distance field
-    float vmin = +INFINITY;
-    for( i=0; i<width*height; ++i)
-    {
-        outside[i] -= inside[i];
-        if( outside[i] < vmin )
-        {
-            vmin = outside[i];
-        }
-    }
-    vmin = abs(vmin);
-    for( i=0; i<width*height; ++i)
-    {
-        float v = outside[i];
-        if     ( v < -vmin) outside[i] = -vmin;
-        else if( v > +vmin) outside[i] = +vmin;
-        data[i] = (outside[i]+vmin)/(2*vmin);
-    }
-
-    free( xdist );
-    free( ydist );
-    free( gx );
-    free( gy );
-    free( outside );
-    free( inside );
-}
+mat4  model, view, projection;
 
 
 // ------------------------------------------------------ MitchellNetravali ---
@@ -213,83 +166,9 @@ resize( double *src_data, size_t src_width, size_t src_height,
 }
 
 
-
-
-
-
-// ---------------------------------------------------------------- display ---
-void display( GLFWwindow* window )
-{
-    glClearColor(1.0,1.0,1.0,1.0);
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, atlas->id);
-    glEnable( GL_TEXTURE_2D );
-    glEnable( GL_BLEND );
-    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-
-    GLuint handle = glGetUniformLocation( program, "texture" );
-    glUniform1i( handle, 0);
-
-    texture_glyph_t * glyph = texture_font_get_glyph( font, L'@');
-
-    float s0 = glyph->s0;
-    float t0 = glyph->t0;
-    float s1 = glyph->s1;
-    float t1 = glyph->t1;
-
-    int width = 512;
-    int height = 512;
-    if( glyph->width > glyph->height )
-        height = glyph->height * width/(float)glyph->width;
-    else
-        width = glyph->width * height/(float)glyph->height;
-    int x = 0 - width/2;
-    int y = 0 - height/2;
-
-    glPushMatrix();
-    glTranslatef(256,256,0);
-    glRotatef(angle, 0,0,1);
-    float s = .025+.975*(1+cos(angle/100.0))/2.;
-    glScalef(s,s,s);
-
-    glBegin(GL_QUADS);
-    glTexCoord2f( s0, t1 ); glVertex2f( x, y );
-    glTexCoord2f( s0, t0 ); glVertex2f( x, y+height );
-    glTexCoord2f( s1, t0 ); glVertex2f( x+width, y+height );
-    glTexCoord2f( s1, t1 ); glVertex2f( x+width, y );
-    glEnd();
-    glPopMatrix();
-
-    glfwSwapBuffers( window );
-}
-
-
-// ---------------------------------------------------------------- reshape ---
-void reshape( GLFWwindow* window, int width, int height )
-{
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-}
-
-
-// --------------------------------------------------------------- keyboard ---
-void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
-{
-    if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
-    {
-        glfwSetWindowShouldClose( window, GL_TRUE );
-    }
-}
-
-
 // ------------------------------------------------------------- load_glyph ---
 texture_glyph_t *
-load_glyph( const char *  filename,     const wchar_t charcode,
+load_glyph( const char *  filename,     const char* codepoint,
             const float   highres_size, const float   lowres_size,
             const float   padding )
 {
@@ -300,7 +179,7 @@ load_glyph( const char *  filename,     const wchar_t charcode,
     FT_Init_FreeType( &library );
     FT_New_Face( library, filename, 0, &face );
     FT_Select_Charmap( face, FT_ENCODING_UNICODE );
-    FT_UInt glyph_index = FT_Get_Char_Index( face, charcode );
+    FT_UInt glyph_index = FT_Get_Char_Index( face, utf8_to_utf32( codepoint ) );
 
     // Render glyph at high resolution (highres_size points)
     FT_Set_Char_Size( face, highres_size*64, 0, 72, 72 );
@@ -327,7 +206,7 @@ load_glyph( const char *  filename,     const wchar_t charcode,
     }
 
     // Compute distance map
-    distance_map( highres_data, highres_width, highres_height );
+    highres_data = make_distance_mapd( highres_data, highres_width, highres_height );
 
     // Allocate low resolution buffer
     size_t lowres_width  = round(highres_width * lowres_size/highres_size);
@@ -362,7 +241,7 @@ load_glyph( const char *  filename,     const wchar_t charcode,
     glyph->offset_y = (slot->bitmap_top + padding*highres_height) * ratio;
     glyph->width    = lowres_width;
     glyph->height   = lowres_height;
-    glyph->charcode = charcode;
+    glyph->codepoint = utf8_to_utf32( codepoint );
     /*
     printf( "Glyph width:  %ld\n", glyph->width );
     printf( "Glyph height: %ld\n", glyph->height );
@@ -398,7 +277,109 @@ load_glyph( const char *  filename,     const wchar_t charcode,
 }
 
 
-/* -------------------------------------------------------- error-callback - */
+// ------------------------------------------------------------------- init ---
+void init( void )
+{
+    atlas = texture_atlas_new( 512, 512, 1 );
+    font = texture_font_new_from_file( atlas, 32, "fonts/Vera.ttf" );
+
+    texture_glyph_t *glyph;
+
+    // Generate the glyp at 512 points, compute distance field and scale it
+    // back to 32 points
+    // Just load another glyph if you want to see difference (draw render a '@')
+    glyph = load_glyph( "fonts/Vera.ttf", "@", 512, 64, 0.1);
+    vector_push_back( font->glyphs, &glyph );
+
+    texture_atlas_upload( atlas );
+
+    glyph = texture_font_get_glyph( font, "@");
+
+    GLuint indices[6] = {0,1,2, 0,2,3};
+    vertex_t vertices[4] = { { -.5,-.5,0,  glyph->s0,glyph->t1,  0,0,0,1 },
+                             { -.5, .5,0,  glyph->s0,glyph->t0,  0,0,0,1 },
+                             {  .5, .5,0,  glyph->s1,glyph->t0,  0,0,0,1 },
+                             {  .5,-.5,0,  glyph->s1,glyph->t1,  0,0,0,1 } };
+    buffer = vertex_buffer_new( "vertex:3f,tex_coord:2f,color:4f" );
+    vertex_buffer_push_back( buffer, vertices, 4, indices, 6 );
+
+    program = shader_load( "shaders/distance-field.vert",
+                           "shaders/distance-field-2.frag" );
+    mat4_set_identity( &projection );
+    mat4_set_identity( &model );
+    mat4_set_identity( &view );
+}
+
+
+// ---------------------------------------------------------------- display ---
+void display( GLFWwindow* window )
+{
+    glClearColor(1.0,1.0,1.0,1.0);
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, atlas->id);
+    glEnable( GL_TEXTURE_2D );
+    glEnable( GL_BLEND );
+    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+    texture_glyph_t * glyph = texture_font_get_glyph( font, "@");
+
+    int width = 512;
+    int height = 512;
+    float glyph_height = glyph->height * width/(float)glyph->width;
+    float glyph_width  = glyph->width * height/(float)glyph->height;
+    int x = -glyph_width/2 + 512/2.;
+    int y = -glyph_height/2 + 512/2.;
+
+    float s = .025+.975*(1+cos(angle/100.0))/2.;
+
+    vec4 color = {{1.0, 1.0, 1.0, 1.0 }};
+
+    mat4_set_identity( &model );
+    mat4_scale( &model, width * s, width * s, 1 );
+    mat4_rotate( &model, angle, 0, 0, 1 );
+    mat4_translate( &model, 256, 256, 0 );
+
+    glUseProgram( program );
+    {
+        glUniform1i( glGetUniformLocation( program, "u_texture" ),
+                     0);
+        glUniform4f( glGetUniformLocation( program, "u_color" ),
+                     color.r, color.g, color.b, color.a);
+        glUniformMatrix4fv( glGetUniformLocation( program, "u_model" ),
+                            1, 0, model.data);
+        glUniformMatrix4fv( glGetUniformLocation( program, "u_view" ),
+                            1, 0, view.data);
+        glUniformMatrix4fv( glGetUniformLocation( program, "u_projection" ),
+                            1, 0, projection.data);
+
+        vertex_buffer_render( buffer, GL_TRIANGLES );
+    }
+
+    glfwSwapBuffers( window );
+}
+
+
+// ---------------------------------------------------------------- reshape ---
+void reshape( GLFWwindow* window, int width, int height )
+{
+    glViewport(0, 0, width, height);
+    mat4_set_orthographic( &projection, 0, width, 0, height, -1, 1);
+}
+
+
+// --------------------------------------------------------------- keyboard ---
+void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
+{
+    if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
+    {
+        glfwSetWindowShouldClose( window, GL_TRUE );
+    }
+}
+
+
+// --------------------------------------------------------- error-callback ---
 void error_callback( int error, const char* description )
 {
     fputs( description, stderr );
@@ -417,10 +398,10 @@ int main( int argc, char **argv )
         exit( EXIT_FAILURE );
     }
 
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
 
-    window = glfwCreateWindow( 1, 1, "Distance fields demo", NULL, NULL );
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
 
     if (!window)
     {
@@ -446,21 +427,8 @@ int main( int argc, char **argv )
     }
     fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 #endif
-    program = shader_load( "shaders/distance-field.vert",
-                           "shaders/distance-field-3.frag" );
-    glUseProgram( program );
-    atlas = texture_atlas_new( 512, 512, 1 );
-    font = texture_font_new_from_file( atlas, 32, "fonts/Vera.ttf" );
 
-    texture_glyph_t *glyph;
-
-    // Generate the glyp at 512 points, compute distance field and scale it
-    // back to 32 points
-    // Just load another glyph if you want to see difference (draw render a '@')
-    glyph = load_glyph( "fonts/Vera.ttf", L'@', 512, 64, 0.1);
-    vector_push_back( font->glyphs, &glyph );
-
-    texture_atlas_upload( atlas );
+    init();
 
     glfwSetWindowSize( window, 512, 512 );
     glfwShowWindow( window );
@@ -480,5 +448,5 @@ int main( int argc, char **argv )
     glfwDestroyWindow( window );
     glfwTerminate( );
 
-    return 0;
+    return EXIT_SUCCESS;
 }

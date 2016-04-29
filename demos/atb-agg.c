@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -34,6 +34,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <AntTweakBar.h>
+
 #include "freetype-gl.h"
 #include "vertex-buffer.h"
 #include "text-buffer.h"
@@ -83,22 +84,22 @@ float p_primary;
 float p_secondary;
 float p_tertiary;
 
-static wchar_t text[] =
-    L"A single pixel on a color LCD is made of three colored elements \n"
-    L"ordered (on various displays) either as blue, green, and red (BGR), \n"
-    L"or as red, green, and blue (RGB). These pixel components, sometimes \n"
-    L"called sub-pixels, appear as a single color to the human eye because \n"
-    L"of blurring by the optics and spatial integration by nerve cells in "
-    L"the eye.\n"
-    L"\n"
-    L"The resolution at which colored sub-pixels go unnoticed differs, \n"
-    L"however, with each user some users are distracted by the colored \n"
-    L"\"fringes\" resulting from sub-pixel rendering. Subpixel rendering \n"
-    L"is better suited to some display technologies than others. The \n"
-    L"technology is well-suited to LCDs, but less so for CRTs. In a CRT \n"
-    L"the light from the pixel components often spread across pixels, \n"
-    L"and the outputs of adjacent pixels are not perfectly independent."
-    L"\n";
+static char text[] =
+    "A single pixel on a color LCD is made of three colored elements \n"
+    "ordered (on various displays) either as blue, green, and red (BGR), \n"
+    "or as red, green, and blue (RGB). These pixel components, sometimes \n"
+    "called sub-pixels, appear as a single color to the human eye because \n"
+    "of blurring by the optics and spatial integration by nerve cells in "
+    "the eye.\n"
+    "\n"
+    "The resolution at which colored sub-pixels go unnoticed differs, \n"
+    "however, with each user some users are distracted by the colored \n"
+    "\"fringes\" resulting from sub-pixel rendering. Subpixel rendering \n"
+    "is better suited to some display technologies than others. The \n"
+    "technology is well-suited to LCDs, but less so for CRTs. In a CRT \n"
+    "the light from the pixel components often spread across pixels, \n"
+    "and the outputs of adjacent pixels are not perfectly independent."
+    "\n";
 
 
 // ----------------------------------------------------------- build_buffer ---
@@ -209,7 +210,7 @@ build_buffer( void )
         float x1 = v2->x, y1 = v2->y;
         v2->x = v3->x = x0 + (x1-x0)*p_width;
 
-        float dy = abs(y1-y0);
+        float dy = fabs(y1-y0);
         float dx = tan(p_faux_italic/180.0 * M_PI) * dy;
         v0->x += dx;
         v0->shift = fmod(v0->shift + dx-(int)(dx),1.0);
@@ -217,181 +218,9 @@ build_buffer( void )
         v3->shift = fmod(v3->shift + dx-(int)(dx),1.0);
     }
 
+    texture_atlas_upload( atlas);
 
     texture_font_delete( font );
-}
-
-
-
-// ---------------------------------------------------------------- display ---
-void display( GLFWwindow* window )
-{
-    vec4 black  = {{0.0, 0.0, 0.0, 1.0}};
-    vec4 white  = {{1.0, 1.0, 1.0, 1.0}};
-
-    if( !p_invert )
-    {
-        glClearColor( 0, 0, 0, 1 );
-        buffer->base_color = white;
-
-    }
-    else
-    {
-        glClearColor( 1, 1, 1, 1 );
-        buffer->base_color = black;
-    }
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
-    glUseProgram( buffer->shader );
-    {
-        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "model" ),
-                            1, 0, model.data);
-        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "view" ),
-                            1, 0, view.data);
-        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "projection" ),
-                            1, 0, projection.data);
-        text_buffer_render( buffer );
-    }
-
-    TwDraw( );
-    glfwSwapBuffers( window );
-}
-
-
-// ---------------------------------------------------------------- reshape ---
-void reshape( GLFWwindow* window, int width, int height )
-{
-    glViewport(0, 0, width, height);
-    mat4_set_orthographic( &projection, 0, width, 0, height, -1, 1);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    TwWindowSize( width, height );
-}
-
-
-// ------------------------------------------------------------- cursor_pos ---
-void cursor_pos( GLFWwindow* window, double x, double y )
-{
-    TwMouseMotion( x, y );
-}
-
-
-// ----------------------------------------------------------- mouse_button ---
-void mouse_button( GLFWwindow* window, int button, int action, int mods)
-{
-    TwMouseAction tw_action;
-    TwMouseButtonID tw_button;
-
-    if ( GLFW_RELEASE == action )
-    {
-        tw_action = TW_MOUSE_RELEASED;
-    }
-    else
-    {
-        tw_action = TW_MOUSE_PRESSED;
-    }
-
-    switch (button)
-    {
-        case GLFW_MOUSE_BUTTON_LEFT:
-            tw_button = TW_MOUSE_LEFT;
-            break;
-        case GLFW_MOUSE_BUTTON_MIDDLE:
-            tw_button = TW_MOUSE_MIDDLE;
-            break;
-        case GLFW_MOUSE_BUTTON_RIGHT:
-            tw_button = TW_MOUSE_RIGHT;
-            break;
-        default:
-            return;
-    }
-
-    TwMouseButton( tw_action, tw_button );
-}
-
-
-// --------------------------------------------------------------- keyboard ---
-void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
-{
-    int tw_key = 0;
-    int tw_mods = TW_KMOD_NONE;
-
-    if( action != GLFW_PRESS )
-    {
-        return;
-    }
-
-    // those map to the corresponding number ascii code
-    if ( GLFW_KEY_0 <= key && key <= GLFW_KEY_9 )
-    {
-        tw_key = key;
-    }
-
-    // those map to the corresponding upper case ascii code
-    if ( GLFW_KEY_A <= key && key <= GLFW_KEY_Z )
-    {
-        tw_key = key;
-    }
-
-    if ( GLFW_KEY_PERIOD == key )
-    {
-        tw_key = '.';
-    }
-
-    if ( GLFW_KEY_BACKSPACE == key )
-    {
-        tw_key = TW_KEY_BACKSPACE;
-    }
-
-    if ( GLFW_KEY_DELETE == key )
-    {
-        tw_key = TW_KEY_DELETE;
-    }
-
-    if ( GLFW_KEY_LEFT == key )
-    {
-        tw_key = TW_KEY_LEFT;
-    }
-
-    if ( GLFW_KEY_RIGHT == key )
-    {
-        tw_key = TW_KEY_RIGHT;
-    }
-
-    if ( GLFW_KEY_UP == key )
-    {
-        tw_key = TW_KEY_UP;
-    }
-
-    if ( GLFW_KEY_DOWN == key )
-    {
-        tw_key = TW_KEY_DOWN;
-    }
-
-    if ( GLFW_KEY_ENTER == key )
-    {
-        tw_key = TW_KEY_RETURN;
-    }
-
-    if( GLFW_MOD_SHIFT & mods )
-    {
-        tw_mods |= TW_KMOD_SHIFT;
-    }
-
-    if( GLFW_MOD_CONTROL & mods )
-    {
-        tw_mods |= TW_KMOD_CTRL;
-    }
-
-    if( GLFW_MOD_ALT & mods )
-    {
-        tw_mods |= TW_KMOD_ALT;
-    }
-
-    TwKeyPressed( tw_key, tw_mods );
 }
 
 
@@ -607,58 +436,9 @@ void TW_CALL get_tertiary( void *value, void *data )
 }
 
 
-/* -------------------------------------------------------- error-callback - */
-void error_callback( int error, const char* description )
+// ------------------------------------------------------------------- init ---
+void init( GLFWwindow* window )
 {
-    fputs( description, stderr );
-}
-
-
-// Main
-int main(int argc, char *argv[])
-{
-    GLFWwindow* window;
-
-    glfwSetErrorCallback( error_callback );
-
-    if (!glfwInit( ))
-    {
-        exit( EXIT_FAILURE );
-    }
-
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
-    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
-
-    window = glfwCreateWindow( 1, 1, "Font rendering advanced tweaking", NULL, NULL );
-
-    if (!window)
-    {
-        glfwTerminate( );
-        exit( EXIT_FAILURE );
-    }
-
-    glfwMakeContextCurrent( window );
-    glfwSwapInterval( 1 );
-
-    TwInit( TW_OPENGL, NULL );
-
-    glfwSetFramebufferSizeCallback( window, reshape );
-    glfwSetWindowRefreshCallback( window, display );
-    glfwSetCursorPosCallback( window, cursor_pos );
-    glfwSetMouseButtonCallback( window, mouse_button );
-    glfwSetKeyCallback( window, keyboard );
-
-#ifndef __APPLE__
-    GLenum err = glewInit();
-    if (GLEW_OK != err)
-    {
-        /* Problem: glewInit failed, something is seriously wrong. */
-        fprintf( stderr, "Error: %s\n", glewGetErrorString(err) );
-        exit( EXIT_FAILURE );
-    }
-    fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
-#endif
-
     // Create a new tweak bar
     bar = TwNewBar("TweakBar");
     TwDefine("GLOBAL "
@@ -785,14 +565,241 @@ int main(int argc, char *argv[])
     TwAddButton(bar, "Quit", (TwButtonCallback) quit, window,
                 "help='Quit.'");
 
-    buffer_a = text_buffer_new( 1 );
-    buffer_rgb = text_buffer_new( 3 );
+    buffer_a = text_buffer_new( LCD_FILTERING_OFF,
+                                "shaders/text.vert",
+                                "shaders/text.frag" );
+    buffer_rgb = text_buffer_new( LCD_FILTERING_ON,
+                                  "shaders/text.vert",
+                                  "shaders/text.frag" );
     buffer = buffer_rgb;
     reset();
 
     mat4_set_identity( &projection );
     mat4_set_identity( &model );
     mat4_set_identity( &view );
+}
+
+
+// ---------------------------------------------------------------- display ---
+void display( GLFWwindow* window )
+{
+    vec4 black  = {{0.0, 0.0, 0.0, 1.0}};
+    vec4 white  = {{1.0, 1.0, 1.0, 1.0}};
+
+    if( !p_invert )
+    {
+        glClearColor( 0, 0, 0, 1 );
+        buffer->base_color = white;
+
+    }
+    else
+    {
+        glClearColor( 1, 1, 1, 1 );
+        buffer->base_color = black;
+    }
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+    glUseProgram( buffer->shader );
+    {
+        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "model" ),
+                            1, 0, model.data);
+        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "view" ),
+                            1, 0, view.data);
+        glUniformMatrix4fv( glGetUniformLocation( buffer->shader, "projection" ),
+                            1, 0, projection.data);
+        text_buffer_render( buffer );
+    }
+
+    TwDraw( );
+    glfwSwapBuffers( window );
+}
+
+
+// ---------------------------------------------------------------- reshape ---
+void reshape( GLFWwindow* window, int width, int height )
+{
+    glViewport(0, 0, width, height);
+    mat4_set_orthographic( &projection, 0, width, 0, height, -1, 1);
+    TwWindowSize( width, height );
+}
+
+
+// ------------------------------------------------------------- cursor_pos ---
+void cursor_pos( GLFWwindow* window, double x, double y )
+{
+    TwMouseMotion( x, y );
+}
+
+
+// ----------------------------------------------------------- mouse_button ---
+void mouse_button( GLFWwindow* window, int button, int action, int mods)
+{
+    TwMouseAction tw_action;
+    TwMouseButtonID tw_button;
+
+    if ( GLFW_RELEASE == action )
+    {
+        tw_action = TW_MOUSE_RELEASED;
+    }
+    else
+    {
+        tw_action = TW_MOUSE_PRESSED;
+    }
+
+    switch (button)
+    {
+        case GLFW_MOUSE_BUTTON_LEFT:
+            tw_button = TW_MOUSE_LEFT;
+            break;
+        case GLFW_MOUSE_BUTTON_MIDDLE:
+            tw_button = TW_MOUSE_MIDDLE;
+            break;
+        case GLFW_MOUSE_BUTTON_RIGHT:
+            tw_button = TW_MOUSE_RIGHT;
+            break;
+        default:
+            return;
+    }
+
+    TwMouseButton( tw_action, tw_button );
+}
+
+
+// --------------------------------------------------------------- keyboard ---
+void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
+{
+    int tw_key = 0;
+    int tw_mods = TW_KMOD_NONE;
+
+    if( action != GLFW_PRESS )
+    {
+        return;
+    }
+
+    // those map to the corresponding number ascii code
+    if ( GLFW_KEY_0 <= key && key <= GLFW_KEY_9 )
+    {
+        tw_key = key;
+    }
+
+    // those map to the corresponding upper case ascii code
+    if ( GLFW_KEY_A <= key && key <= GLFW_KEY_Z )
+    {
+        tw_key = key;
+    }
+
+    if ( GLFW_KEY_PERIOD == key )
+    {
+        tw_key = '.';
+    }
+
+    if ( GLFW_KEY_BACKSPACE == key )
+    {
+        tw_key = TW_KEY_BACKSPACE;
+    }
+
+    if ( GLFW_KEY_DELETE == key )
+    {
+        tw_key = TW_KEY_DELETE;
+    }
+
+    if ( GLFW_KEY_LEFT == key )
+    {
+        tw_key = TW_KEY_LEFT;
+    }
+
+    if ( GLFW_KEY_RIGHT == key )
+    {
+        tw_key = TW_KEY_RIGHT;
+    }
+
+    if ( GLFW_KEY_UP == key )
+    {
+        tw_key = TW_KEY_UP;
+    }
+
+    if ( GLFW_KEY_DOWN == key )
+    {
+        tw_key = TW_KEY_DOWN;
+    }
+
+    if ( GLFW_KEY_ENTER == key )
+    {
+        tw_key = TW_KEY_RETURN;
+    }
+
+    if( GLFW_MOD_SHIFT & mods )
+    {
+        tw_mods |= TW_KMOD_SHIFT;
+    }
+
+    if( GLFW_MOD_CONTROL & mods )
+    {
+        tw_mods |= TW_KMOD_CTRL;
+    }
+
+    if( GLFW_MOD_ALT & mods )
+    {
+        tw_mods |= TW_KMOD_ALT;
+    }
+
+    TwKeyPressed( tw_key, tw_mods );
+}
+
+
+// --------------------------------------------------------- error-callback ---
+void error_callback( int error, const char* description )
+{
+    fputs( description, stderr );
+}
+
+
+// ------------------------------------------------------------------- main ---
+int main( int argc, char **argv )
+{
+    GLFWwindow* window;
+
+    glfwSetErrorCallback( error_callback );
+
+    if (!glfwInit( ))
+    {
+        exit( EXIT_FAILURE );
+    }
+
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
+    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
+
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
+
+    if (!window)
+    {
+        glfwTerminate( );
+        exit( EXIT_FAILURE );
+    }
+
+    glfwMakeContextCurrent( window );
+    glfwSwapInterval( 1 );
+
+    TwInit( TW_OPENGL, NULL );
+
+    glfwSetFramebufferSizeCallback( window, reshape );
+    glfwSetWindowRefreshCallback( window, display );
+    glfwSetCursorPosCallback( window, cursor_pos );
+    glfwSetMouseButtonCallback( window, mouse_button );
+    glfwSetKeyCallback( window, keyboard );
+
+#ifndef __APPLE__
+    GLenum err = glewInit();
+    if (GLEW_OK != err)
+    {
+        /* Problem: glewInit failed, something is seriously wrong. */
+        fprintf( stderr, "Error: %s\n", glewGetErrorString(err) );
+        exit( EXIT_FAILURE );
+    }
+    fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
+#endif
+
+    init( window );
 
     glfwSetWindowSize( window, 800, 600 );
     glfwShowWindow( window );

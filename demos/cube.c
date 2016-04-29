@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -13,7 +13,7 @@
  *
  *  2. Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials proided with the distribution.
+ *     documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY NICOLAS P. ROUGIER ''AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
@@ -32,8 +32,10 @@
  * ============================================================================
  */
 #include <stdio.h>
+
 #include "freetype-gl.h"
 #include "shader.h"
+#include "mat4.h"
 #include "vertex-buffer.h"
 
 #include <GLFW/glfw3.h>
@@ -42,12 +44,39 @@
 // ------------------------------------------------------- global variables ---
 GLuint shader;
 vertex_buffer_t * cube;
-
+mat4  model, view, projection;
 
 
 // ------------------------------------------------------------------- init ---
 void init( void )
 {
+    typedef struct { float x,y,z;} xyz;
+    typedef struct { float r,g,b,a;} rgba;
+    typedef struct { xyz position, normal; rgba color;} vertex;
+    xyz v[] = { { 1, 1, 1},  {-1, 1, 1},  {-1,-1, 1}, { 1,-1, 1},
+                { 1,-1,-1},  { 1, 1,-1},  {-1, 1,-1}, {-1,-1,-1} };
+    xyz n[] = { { 0, 0, 1},  { 1, 0, 0},  { 0, 1, 0} ,
+                {-1, 0, 1},  { 0,-1, 0},  { 0, 0,-1} };
+    rgba c[] = { {1, 1, 1, 1},  {1, 1, 0, 1},  {1, 0, 1, 1},  {0, 1, 1, 1},
+                 {1, 0, 0, 1},  {0, 0, 1, 1},  {0, 1, 0, 1},  {0, 0, 0, 1} };
+    vertex vertices[24] =  {
+      {v[0],n[0],c[0]}, {v[1],n[0],c[1]}, {v[2],n[0],c[2]}, {v[3],n[0],c[3]},
+      {v[0],n[1],c[0]}, {v[3],n[1],c[3]}, {v[4],n[1],c[4]}, {v[5],n[1],c[5]},
+      {v[0],n[2],c[0]}, {v[5],n[2],c[5]}, {v[6],n[2],c[6]}, {v[1],n[2],c[1]},
+      {v[1],n[3],c[1]}, {v[6],n[3],c[6]}, {v[7],n[3],c[7]}, {v[2],n[3],c[2]},
+      {v[7],n[4],c[7]}, {v[4],n[4],c[4]}, {v[3],n[4],c[3]}, {v[2],n[4],c[2]},
+      {v[4],n[5],c[4]}, {v[7],n[5],c[7]}, {v[6],n[5],c[6]}, {v[5],n[5],c[5]} };
+    GLuint indices[24] = { 0, 1, 2, 3,    4, 5, 6, 7,   8, 9,10,11,
+                           12,13,14,15,  16,17,18,19,  20,21,22,23 };
+
+    cube = vertex_buffer_new( "vertex:3f,normal:3f,color:4f" );
+    vertex_buffer_push_back( cube, vertices, 24, indices, 24 );
+    shader = shader_load("shaders/cube.vert","shaders/cube.frag");
+
+    mat4_set_identity( &projection );
+    mat4_set_identity( &model );
+    mat4_set_identity( &view );
+
     glPolygonOffset( 1, 1 );
     glClearColor( 1.0, 1.0, 1.0, 1.0 );
     glEnable( GL_DEPTH_TEST );
@@ -74,26 +103,40 @@ void display( GLFWwindow* window )
     phi = .5f * seconds_elapsed / 0.016f;
 
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-    glPushMatrix();
-    glRotatef( theta, 0,0,1 );
-    glRotatef( phi,   0,1,0 );
+
+    mat4_set_identity( &model );
+    mat4_rotate( &model, theta, 0, 0, 1 );
+    mat4_rotate( &model, phi, 0, 1, 0 );
+    mat4_translate( &model, 0.0, 0.0, -5.0 );
+
     glDisable( GL_BLEND );
     glEnable( GL_DEPTH_TEST );
     glEnable( GL_POLYGON_OFFSET_FILL );
+
     glUseProgram( shader );
+    {
+        glUniformMatrix4fv( glGetUniformLocation( shader, "model" ),
+                            1, 0, model.data);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "view" ),
+                            1, 0, view.data);
+        glUniformMatrix4fv( glGetUniformLocation( shader, "projection" ),
+                            1, 0, projection.data);
+    }
+
     glUniform4f( Color, 1, 1, 1, 1 );
     vertex_buffer_render( cube, GL_QUADS );
+
     glDisable( GL_POLYGON_OFFSET_FILL );
     glEnable( GL_BLEND );
     glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
     glDepthMask( GL_FALSE );
+
     glUniform4f( Color, 0, 0, 0, .5 );
     vertex_buffer_render( cube, GL_QUADS );
+
     glUseProgram( 0 );
     glDepthMask( GL_TRUE );
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-
-    glPopMatrix();
 
     glfwSwapBuffers( window );
 }
@@ -103,12 +146,7 @@ void display( GLFWwindow* window )
 void reshape( GLFWwindow* window, int width, int height )
 {
     glViewport(0, 0, width, height);
-    glMatrixMode( GL_PROJECTION );
-    glLoadIdentity( );
-    gluPerspective( 45.0, width/(float) height, 2.0, 10.0 );
-    glMatrixMode( GL_MODELVIEW );
-    glLoadIdentity( );
-    glTranslatef( 0.0, 0.0, -5.0 );
+    mat4_set_perspective( &projection, 45.0f, width/(float) height, 2.0, 10.0 );
 }
 
 
@@ -122,7 +160,7 @@ void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
 }
 
 
-/* -------------------------------------------------------- error-callback - */
+// --------------------------------------------------------- error-callback ---
 void error_callback( int error, const char* description )
 {
     fputs( description, stderr );
@@ -141,10 +179,10 @@ int main( int argc, char **argv )
         exit( EXIT_FAILURE );
     }
 
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
 
-    window = glfwCreateWindow( 1, 1, "Distance fields demo", NULL, NULL );
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
 
     if (!window)
     {
@@ -171,30 +209,7 @@ int main( int argc, char **argv )
     fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 #endif
 
-    typedef struct { float x,y,z;} xyz;
-    typedef struct { float r,g,b,a;} rgba;
-    typedef struct { xyz position, normal; rgba color;} vertex;
-    xyz v[] = { { 1, 1, 1},  {-1, 1, 1},  {-1,-1, 1}, { 1,-1, 1},
-                { 1,-1,-1},  { 1, 1,-1},  {-1, 1,-1}, {-1,-1,-1} };
-    xyz n[] = { { 0, 0, 1},  { 1, 0, 0},  { 0, 1, 0} ,
-                {-1, 0, 1},  { 0,-1, 0},  { 0, 0,-1} };
-    rgba c[] = { {1, 1, 1, 1},  {1, 1, 0, 1},  {1, 0, 1, 1},  {0, 1, 1, 1},
-                 {1, 0, 0, 1},  {0, 0, 1, 1},  {0, 1, 0, 1},  {0, 0, 0, 1} };
-    vertex vertices[24] =  {
-      {v[0],n[0],c[0]}, {v[1],n[0],c[1]}, {v[2],n[0],c[2]}, {v[3],n[0],c[3]},
-      {v[0],n[1],c[0]}, {v[3],n[1],c[3]}, {v[4],n[1],c[4]}, {v[5],n[1],c[5]},
-      {v[0],n[2],c[0]}, {v[5],n[2],c[5]}, {v[6],n[2],c[6]}, {v[1],n[2],c[1]},
-      {v[1],n[3],c[1]}, {v[6],n[3],c[6]}, {v[7],n[3],c[7]}, {v[2],n[3],c[2]},
-      {v[7],n[4],c[7]}, {v[4],n[4],c[4]}, {v[3],n[4],c[3]}, {v[2],n[4],c[2]},
-      {v[4],n[5],c[4]}, {v[7],n[5],c[7]}, {v[6],n[5],c[6]}, {v[5],n[5],c[5]} };
-    GLuint indices[24] = { 0, 1, 2, 3,    4, 5, 6, 7,   8, 9,10,11,
-                           12,13,14,15,  16,17,18,19,  20,21,22,23 };
-
-    cube = vertex_buffer_new( "vertex:3f,normal:3f,color:4f" );
-    vertex_buffer_push_back( cube, vertices, 24, indices, 24 );
-    shader = shader_load("shaders/cube.vert","shaders/cube.frag");
-
-    init( );
+    init();
 
     glfwSetWindowSize( window, 400, 400 );
     glfwShowWindow( window );

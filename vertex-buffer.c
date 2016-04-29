@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -576,7 +576,7 @@ vertex_buffer_erase_vertices( vertex_buffer_t *self,
     assert( self );
     assert( self->vertices );
     assert( first < self->vertices->size );
-    assert( (first+last) <= self->vertices->size );
+    assert( last <= self->vertices->size );
     assert( last > first );
 
     self->state |= DIRTY;
@@ -647,7 +647,8 @@ vertex_buffer_erase( vertex_buffer_t * self,
                      const size_t index )
 {
     ivec4 * item;
-    size_t vstart, vcount, istart, icount, i;
+    int vstart;
+    size_t vcount, istart, icount, i;
 
     assert( self );
     assert( index < vector_size( self->items ) );

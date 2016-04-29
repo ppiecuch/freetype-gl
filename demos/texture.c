@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -36,12 +36,13 @@
  * ============================================================================
  */
 #include <stdio.h>
-#include <wchar.h>
+#include <string.h>
 
 #include "freetype-gl.h"
 #include "mat4.h"
 #include "shader.h"
 #include "vertex-buffer.h"
+#include "utf8-utils.h"
 
 #include <GLFW/glfw3.h>
 
@@ -50,6 +51,60 @@
 GLuint shader;
 vertex_buffer_t * buffer;
 mat4 model, view, projection;
+
+
+// ------------------------------------------------------------------- init ---
+void init( void )
+{
+    texture_atlas_t * atlas = texture_atlas_new( 512, 512, 1 );
+    const char *filename = "fonts/Vera.ttf";
+    const char * cache = " !\"#$%&'()*+,-./0123456789:;<=>?"
+                         "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
+                         "`abcdefghijklmnopqrstuvwxyz{|}~";
+    size_t minsize = 8, maxsize = 27;
+    size_t count = maxsize - minsize;
+    size_t i, missed = 0;
+
+    for( i=minsize; i < maxsize; ++i )
+    {
+        texture_font_t * font = texture_font_new_from_file( atlas, i, filename );
+        missed += texture_font_load_glyphs( font, cache );
+        texture_atlas_upload( font->atlas );
+        texture_font_delete( font );
+    }
+
+    printf( "Matched font               : %s\n", filename );
+    printf( "Number of fonts            : %ld\n", count );
+    printf( "Number of glyphs per font  : %ld\n", utf8_strlen(cache) );
+    printf( "Number of missed glyphs    : %ld\n", missed );
+    printf( "Total number of glyphs     : %ld/%ld\n",
+            utf8_strlen(cache)*count - missed, utf8_strlen(cache)*count );
+    printf( "Texture size               : %ldx%ld\n", atlas->width, atlas->height );
+    printf( "Texture occupancy          : %.2f%%\n",
+            100.0*atlas->used/(float)(atlas->width*atlas->height) );
+
+    glClearColor(1,1,1,1);
+    glEnable( GL_BLEND );
+    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+    glEnable( GL_TEXTURE_2D );
+    glBindTexture( GL_TEXTURE_2D, atlas->id );
+
+    typedef struct { float x,y,z, u,v, r,g,b,a; } vertex_t;
+    vertex_t vertices[4] =  {
+        {  0,  0,0, 0,1, 0,0,0,1},
+        {  0,512,0, 0,0, 0,0,0,1},
+        {512,512,0, 1,0, 0,0,0,1},
+        {512,  0,0, 1,1, 0,0,0,1} };
+    GLuint indices[6] = { 0, 1, 2, 0,2,3 };
+    buffer = vertex_buffer_new( "vertex:3f,tex_coord:2f,color:4f" );
+    vertex_buffer_push_back( buffer, vertices, 4, indices, 6 );
+
+    shader = shader_load("shaders/v3f-t2f-c4f.vert",
+                         "shaders/v3f-t2f-c4f.frag");
+    mat4_set_identity( &projection );
+    mat4_set_identity( &model );
+    mat4_set_identity( &view );
+}
 
 
 // ---------------------------------------------------------------- display ---
@@ -110,7 +165,7 @@ int main( int argc, char **argv )
         exit( EXIT_FAILURE );
     }
 
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
     glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
 
     window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
@@ -139,53 +194,8 @@ int main( int argc, char **argv )
     }
     fprintf( stderr, "Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 #endif
-    texture_atlas_t * atlas = texture_atlas_new( 512, 512, 1 );
-    const char *filename = "fonts/Vera.ttf";
-    const wchar_t *cache = L" !\"#$%&'()*+,-./0123456789:;<=>?"
-                           L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
-                           L"`abcdefghijklmnopqrstuvwxyz{|}~";
-    size_t minsize = 8, maxsize = 27;
-    size_t count = maxsize - minsize;
-    size_t i, missed = 0;
 
-    for( i=minsize; i < maxsize; ++i )
-    {
-        texture_font_t * font = texture_font_new_from_file( atlas, i, filename );
-        missed += texture_font_load_glyphs( font, cache );
-        texture_font_delete( font );
-    }
-
-    printf( "Matched font               : %s\n", filename );
-    printf( "Number of fonts            : %ld\n", count );
-    printf( "Number of glyphs per font  : %ld\n", wcslen(cache) );
-    printf( "Number of missed glyphs    : %ld\n", missed );
-    printf( "Total number of glyphs     : %ld/%ld\n",
-            wcslen(cache)*count - missed, wcslen(cache)*count );
-    printf( "Texture size               : %ldx%ld\n", atlas->width, atlas->height );
-    printf( "Texture occupancy          : %.2f%%\n",
-            100.0*atlas->used/(float)(atlas->width*atlas->height) );
-
-    glClearColor(1,1,1,1);
-    glEnable( GL_BLEND );
-    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-    glEnable( GL_TEXTURE_2D );
-    glBindTexture( GL_TEXTURE_2D, atlas->id );
-
-    typedef struct { float x,y,z, u,v, r,g,b,a; } vertex_t;
-    vertex_t vertices[4] =  {
-        {  0, 0, 0, 0,1, 0,0,0,1},
-        {  0,512,0, 0,0, 0,0,0,1},
-        {512,512,0, 1,0, 0,0,0,1},
-        {512,  0,0, 1,1, 0,0,0,1} };
-    GLuint indices[6] = { 0, 1, 2, 0,2,3 };
-    buffer = vertex_buffer_new( "vertex:3f,tex_coord:2f,color:4f" );
-    vertex_buffer_push_back( buffer, vertices, 4, indices, 6 );
-
-    shader = shader_load("shaders/v3f-t2f-c4f.vert",
-                         "shaders/v3f-t2f-c4f.frag");
-    mat4_set_identity( &projection );
-    mat4_set_identity( &model );
-    mat4_set_identity( &view );
+    init();
 
     glfwSetWindowSize( window, 512, 512 );
     glfwShowWindow( window );
@@ -199,5 +209,5 @@ int main( int argc, char **argv )
     glfwDestroyWindow( window );
     glfwTerminate( );
 
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -1,7 +1,7 @@
 /* ============================================================================
  * Freetype GL - A C OpenGL Freetype engine
  * Platform:    Any
- * WWW:         http://code.google.com/p/freetype-gl/
+ * WWW:         https://github.com/rougier/freetype-gl
  * ----------------------------------------------------------------------------
  * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.
  *
@@ -31,26 +31,30 @@
  * policies, either expressed or implied, of Nicolas P. Rougier.
  * ============================================================================
  */
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "opengl.h"
 #include "vec234.h"
 #include "vector.h"
+#include "utf8-utils.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <wchar.h>
+
 #include "vera-16.h"
 
 #include <GLFW/glfw3.h>
 
-void print_at( int pen_x, int pen_y, wchar_t *text )
+// --------------------------------------------------------------- print_at ---
+void print_at( int pen_x, int pen_y, char *text )
 {
     size_t i, j;
-    for( i=0; i<wcslen(text); ++i)
+    for( i=0; i < strlen(text); ++i)
     {
         texture_glyph_t *glyph = 0;
         for( j=0; j<font.glyphs_count; ++j)
         {
-            if( font.glyphs[j].charcode == text[i] )
+            if( font.glyphs[j].codepoint == utf8_to_utf32( text + i ) )
             {
                 glyph = &font.glyphs[j];
                 break;
@@ -81,70 +85,9 @@ void print_at( int pen_x, int pen_y, wchar_t *text )
 }
 
 
-void display( GLFWwindow* window )
+// ------------------------------------------------------------------- init ---
+void init( void )
 {
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-    glColor4f(0,0,0,1);
-    print_at( 100, 100, L"Hello World !" );
-
-    glfwSwapBuffers( window );
-}
-
-
-void reshape( GLFWwindow* window, int width, int height )
-{
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-}
-
-
-void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
-{
-    if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
-    {
-        glfwSetWindowShouldClose( window, GL_TRUE );
-    }
-}
-
-
-void error_callback( int error, const char* description )
-{
-    fputs( description, stderr );
-}
-
-
-int main( int argc, char **argv )
-{
-    GLFWwindow* window;
-
-    glfwSetErrorCallback( error_callback );
-
-    if (!glfwInit( ))
-    {
-        exit( EXIT_FAILURE );
-    }
-
-    glfwWindowHint( GLFW_VISIBLE, GL_TRUE );
-    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
-
-    window = glfwCreateWindow( 1, 1, "Freetype OpenGL", NULL, NULL );
-
-    if (!window)
-    {
-        glfwTerminate( );
-        exit( EXIT_FAILURE );
-    }
-
-    glfwMakeContextCurrent( window );
-    glfwSwapInterval( 1 );
-
-    glfwSetFramebufferSizeCallback( window, reshape );
-    glfwSetWindowRefreshCallback( window, display );
-    glfwSetKeyCallback( window, keyboard );
-
     GLuint texid;
     glGenTextures( 1, &texid );
     glBindTexture( GL_TEXTURE_2D, texid );
@@ -160,6 +103,79 @@ int main( int argc, char **argv )
     glEnable( GL_BLEND );
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
     glEnable( GL_TEXTURE_2D );
+}
+
+
+// ---------------------------------------------------------------- display ---
+void display( GLFWwindow* window )
+{
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+    glColor4f(0,0,0,1);
+    print_at( 100, 100, "Hello World !" );
+
+    glfwSwapBuffers( window );
+}
+
+
+// ---------------------------------------------------------------- reshape ---
+void reshape( GLFWwindow* window, int width, int height )
+{
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, width, 0, height, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+
+// --------------------------------------------------------------- keyboard ---
+void keyboard( GLFWwindow* window, int key, int scancode, int action, int mods )
+{
+    if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
+    {
+        glfwSetWindowShouldClose( window, GL_TRUE );
+    }
+}
+
+
+// --------------------------------------------------------- error-callback ---
+void error_callback( int error, const char* description )
+{
+    fputs( description, stderr );
+}
+
+
+// ------------------------------------------------------------------- main ---
+int main( int argc, char **argv )
+{
+    GLFWwindow* window;
+
+    glfwSetErrorCallback( error_callback );
+
+    if (!glfwInit( ))
+    {
+        exit( EXIT_FAILURE );
+    }
+
+    glfwWindowHint( GLFW_VISIBLE, GL_FALSE );
+    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
+
+    window = glfwCreateWindow( 1, 1, argv[0], NULL, NULL );
+
+    if (!window)
+    {
+        glfwTerminate( );
+        exit( EXIT_FAILURE );
+    }
+
+    glfwMakeContextCurrent( window );
+    glfwSwapInterval( 1 );
+
+    glfwSetFramebufferSizeCallback( window, reshape );
+    glfwSetWindowRefreshCallback( window, display );
+    glfwSetKeyCallback( window, keyboard );
+
+    init();
 
     glfwSetWindowSize( window, 640, 480 );
     glfwShowWindow( window );
@@ -173,5 +189,5 @@ int main( int argc, char **argv )
     glfwDestroyWindow( window );
     glfwTerminate( );
 
-    return 0;
+    return EXIT_SUCCESS;
 }

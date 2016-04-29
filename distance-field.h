@@ -31,10 +31,8 @@
  * policies, either expressed or implied, of Nicolas P. Rougier.
  * ----------------------------------------------------------------------------
  */
-#ifndef __SHADER_H__
-#define __SHADER_H__
-
-#include "opengl.h"
+#ifndef __DISTANCE_FIELD_H__
+#define __DISTANCE_FIELD_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,17 +43,21 @@ namespace ftgl {
  * @file   shader.h
  * @author Nicolas Rougier (Nicolas.Rougier@inria.fr)
  *
- * @defgroup shader Shader
+ * @defgroup distance-field Distance Field
  *
- * Simple functions for loading/building a shader from sources.
+ * Functions to calculate signed distance fields for bitmaps.
  *
  * <b>Example Usage</b>:
  * @code
- * # include "shader.h"
+ * #include "distance-field.h"
  *
  * int main( int arrgc, char *argv[] )
  * {
- *     GLuint shader = shader_load("shader.vert", "shader.frag");
+ *     int width = 512;
+ *     int height = 512;
+ *     unsigned char *image = create_greyscale_image(width, height);
+ *
+ *     image = make_distance_map( image, width, height );
  *
  *     return 0;
  * }
@@ -65,44 +67,23 @@ namespace ftgl {
  */
 
 /**
- * Read a fragment or vertex shader from a file
+ * Create a distance file from the given image.
  *
- * @param filename file to read shader from
- * @return         a newly-allocated text buffer containing code. This buffer
- *                 must be freed after usage.
+ * @param img     A greyscale image.
+ * @param width   The width of the given image.
+ * @param height  The height of the given image.
  *
- */
-  char *
-  shader_read( const char *filename );
-
-
-/**
- * Compile a shader from a text buffer.
- *
- * @param source code of the shader
- * @param type   type of the shader
- *
- * @return a handle on the compiled program
+ * @return        A newly allocated distance field.  This image must
+ *                be freed after usage.
  *
  */
-  GLuint
-  shader_compile( const char* source,
-                  const GLenum type );
+double *
+make_distance_mapd( double *img,
+                    unsigned int width, unsigned int height );
 
-
-/**
- * Load a vertex and fragment shader sources and build program
- *
- * @param  vert_filename vertex shader filename
- * @param  frag_filename fragment shader filename
- *
- * @return a handle on the built program
- *
- */
-  GLuint
-  shader_load( const char * vert_filename,
-               const char * frag_filename );
-
+unsigned char *
+make_distance_mapb( unsigned char *img,
+                    unsigned int width, unsigned int height );
 
 /** @} */
 
@@ -111,4 +92,4 @@ namespace ftgl {
 }
 #endif
 
-#endif /* __SHADER_H__ */
+#endif /* __DISTANCE_FIELD_H__ */
