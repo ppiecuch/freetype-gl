@@ -41,6 +41,7 @@ macro(CREATE_DEMO _target _sources)
         freetype-gl
         ${OPENGL_LIBRARY}
         ${GLFW3_LIBRARY}
+        ${GLFW3_LIBRARIES}
         ${FREETYPE_LIBRARIES}
     )
     if(MATH_LIBRARY)
@@ -62,7 +63,11 @@ endif()
 
 # Find dependencies
 find_package(glfw3 REQUIRED)
-find_package(AntTweakBar)
+if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/darwin/AntTeakBar")
+ set(ANT_TWEAK_BAR_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/darwin/AntTeakBar")
+ELSE()
+ find_package(AntTweakBar)
+ENDIF()
 find_package(FontConfig)
 
 include_directories(

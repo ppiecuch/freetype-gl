@@ -38,6 +38,12 @@ set(CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules"
     "${CMAKE_MODULE_PATH}"
 )
+if(APPLE)
+set(CMAKE_PREFIX_PATH
+	"${CMAKE_PREFIX_PATH}"
+    "${CMAKE_SOURCE_DIR}/darwin"
+)
+ENDIF(APPLE)
 
 option(freetype-gl_USE_VAO "Use a VAO to render a vertex_buffer instance (required for forward compatible OpenGL 3.0 contexts)" OFF)
 option(freetype-gl_BUILD_DEMOS "Build the freetype-gl example programs" ON)

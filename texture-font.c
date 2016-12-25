@@ -707,7 +707,7 @@ texture_glyph_delete( texture_glyph_t *self )
 // ---------------------------------------------- texture_glyph_get_kerning ---
 float
 texture_glyph_get_kerning( const texture_glyph_t * self,
-                           const wchar_t charcode )
+                           const char * codepoint )
 {
     return 0;
 }
@@ -745,7 +745,7 @@ texture_font_delete( texture_font_t *self )
 // ----------------------------------------------- texture_font_load_glyphs ---
 size_t
 texture_font_load_glyphs( texture_font_t * self,
-                          const wchar_t * charcodes )
+                          const char * codepoints )
 {
     return 0;
 }
@@ -754,7 +754,7 @@ texture_font_load_glyphs( texture_font_t * self,
 // ------------------------------------------------- texture_font_get_glyph ---
 texture_glyph_t *
 texture_font_get_glyph( texture_font_t * self,
-                        wchar_t charcode )
+                        const char * codepoints )
 {
     return NULL;
 }
