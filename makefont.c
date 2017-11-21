@@ -25,10 +25,56 @@ void print_help()
 {
     fprintf( stderr, "Usage: makefont [--help] --font <font file> "
              "--header <header file> --size <font size> "
-             "--variable <variable name> --texture <texture size>"
+             "--variable <variable name> --texture <texture size> "
              "--rendermode <one of 'normal', 'outline_edge', 'outline_positive', 'outline_negative' or 'sdf'>\n" );
 }
 
+
+// ------------------------------------------------------------- dump image ---
+void dumpimage( const char *buffer, const int width, const int height, const int depth, const char* path )
+{
+    FILE* out = fopen( path, "wb" );
+
+    uint8_t *data = buffer; 
+    uint8_t bpp = depth*8;
+    if(depth == 1) { // upsacel from 8 to 16bit
+        data = malloc(width * height * 2); for(int i=0; i<width*height*depth; i+=1) {
+            uint16_t tmp;
+            #define BIT(index) (1 << (index))
+            #define FIVE_BITS (BIT(0)|BIT(1)|BIT(2)|BIT(3)|BIT(4))
+            tmp  =  (buffer[i] >> 3) & FIVE_BITS; // r
+            tmp |= ((buffer[i] >> 3) & FIVE_BITS) << 5; // g
+            tmp |= ((buffer[i] >> 3) & FIVE_BITS) << 10; //b
+            if (buffer[i] > 127) tmp |= BIT(15); // a
+            #undef FIVE_BITS
+            #undef BIT
+            data[i*2+0] = (uint8_t) (tmp & 0x00FF);
+            data[i*2+1] = (uint8_t)((tmp & 0xFF00) >> 8);
+        }
+        bpp = 16;
+    }
+    
+    uint8_t tga_header[18] = { 0 };
+    // Data code type -- 2 - uncompressed RGB image.
+    tga_header[2] = 2;
+    // Image width - low byte
+    tga_header[12] = width & 0xFF;
+    // Image width - high byte
+    tga_header[13] = (width >> 8) & 0xFF;
+    // Image height - low byte
+    tga_header[14] = height & 0xFF;
+    // Image height - high byte
+    tga_header[15] = (height >> 8) & 0xFF;
+    // Color bit depth
+    tga_header[16] = bpp; // 16,24,32
+
+    fwrite( tga_header, sizeof(uint8_t), 18, out );
+    fwrite( data, sizeof(uint8_t), width * height * (bpp/8), out );
+
+    fclose( out );
+    if(depth == 1)
+        free( buffer );
+}
 
 // ------------------------------------------------------------------- main ---
 int main( int argc, char **argv )
@@ -522,6 +568,19 @@ int main( int argc, char **argv )
         "#ifdef __cplusplus\n"
         "}\n"
         "#endif\n" );
+
+    fclose( file );
+
+    // ------------------
+    // Dump texture image
+    // ------------------
+    char *ext = strrchr(header_filename, '.');
+    if (ext != NULL)
+        strcpy(ext, ".tga");
+    else
+        strcat(header_filename, ".tga");
+
+    dumpimage(atlas->data, atlas->width, atlas->height, atlas->depth, header_filename);
 
     return 0;
 }
