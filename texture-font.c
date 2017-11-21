@@ -4,8 +4,6 @@
  * file `LICENSE` for more details.
  */
 
-#if !defined(FTGL_AMALGAMATE) || (defined(FTGL_AMALGAMATE) && (defined(FTGL_WITH_FT2) || defined(HAVE_FREETYPE2) || defined(HAVE_FT2)))
-
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_STROKER_H
@@ -420,7 +418,9 @@ texture_font_load_glyph( texture_font_t * self,
         if ( region.x < 0 )
         {
             fprintf( stderr, "Texture atlas is full (line %d)\n",  __LINE__ );
-            return NULL;
+            FT_Done_Face( face );
+            FT_Done_FreeType( library );
+            return 0;
         }
         texture_atlas_set_region( self->atlas, region.x, region.y, 4, 4, data, 0 );
         glyph->codepoint = -1;
@@ -583,6 +583,8 @@ cleanup_stroker:
     if ( region.x < 0 )
     {
         fprintf( stderr, "Texture atlas is full (line %d)\n",  __LINE__ );
+        FT_Done_Face( face );
+        FT_Done_FreeType( library );
         return 0;
     }
 
@@ -649,13 +651,12 @@ size_t
 texture_font_load_glyphs( texture_font_t * self,
                           const char * codepoints )
 {
-    size_t i;
+    size_t i, c;
 
     /* Load each glyph */
-    for( i = 0; i < utf8_strlen(codepoints); i += utf8_surrogate_len(codepoints + i) ) {
+    for( i = 0; i < strlen(codepoints); i += utf8_surrogate_len(codepoints + i) ) {
         if( !texture_font_load_glyph( self, codepoints + i ) )
             return utf8_strlen( codepoints + i );
-
     }
 
     return 0;
@@ -684,78 +685,48 @@ texture_font_get_glyph( texture_font_t * self,
     return NULL;
 }
 
-#else  // FT2 available
-
-// ------------------------------------------------------ texture_glyph_new ---
-texture_glyph_t *
-texture_glyph_new(void)
-{
-    return NULL;
-}
-
-
-// --------------------------------------------------- texture_glyph_delete ---
+// ------------------------------------------------- texture_font_enlarge_atlas ---
 void
-texture_glyph_delete( texture_glyph_t *self )
+texture_font_enlarge_atlas( texture_font_t * self, size_t width_new,
+			    size_t height_new)
 {
-    assert( self );
-    vector_delete( self->kerning );
-    free( self );
+    assert(self);
+    assert(self->atlas);
+    //ensure size increased
+    assert(width_new >= self->atlas->width);
+    assert(height_new >= self->atlas->height);
+    assert(width_new + height_new > self->atlas->width + self->atlas->height);
+    texture_atlas_t* ta = self->atlas;
+    size_t width_old = ta->width;
+    size_t height_old = ta->height;
+    //allocate new buffer
+    unsigned char* data_old = ta->data;
+    ta->data = calloc(1,width_new*height_new * sizeof(char)*ta->depth);
+    //update atlas size
+    ta->width = width_new;
+    ta->height = height_new;
+    //add node reflecting the gained space on the right
+    if(width_new>width_old){
+    	ivec3 node;
+        node.x = width_old - 1;
+        node.y = 1;
+        node.z = width_new - width_old;
+        vector_push_back(ta->nodes, &node);
+    }
+    //copy over data from the old buffer, skipping first row and column because of the margin
+    size_t pixel_size = sizeof(char) * ta->depth;
+    size_t old_row_size = width_old * pixel_size;
+    texture_atlas_set_region(ta, 1, 1, width_old - 2, height_old - 2, data_old + old_row_size + pixel_size, old_row_size);
+    free(data_old);
+    //change uv coordinates of existing glyphs to reflect size change
+    float mulw = (float)width_old / width_new;
+    float mulh = (float)height_old / height_new;
+    size_t i;
+    for (i = 0; i < vector_size(self->glyphs); i++) {
+    	texture_glyph_t* g = *(texture_glyph_t**)vector_get(self->glyphs, i);
+    	g->s0 *= mulw;
+    	g->s1 *= mulw;
+    	g->t0 *= mulh;
+    	g->t1 *= mulh;
+    }
 }
-
-// ---------------------------------------------- texture_glyph_get_kerning ---
-float
-texture_glyph_get_kerning( const texture_glyph_t * self,
-                           const char * codepoint )
-{
-    return 0;
-}
-
-
-// ------------------------------------------ texture_font_generate_kerning ---
-void
-texture_font_generate_kerning( texture_font_t *self )
-{
-}
-
-// --------------------------------------------- texture_font_new_from_file ---
-texture_font_t *
-texture_font_new_from_file(texture_atlas_t *atlas, const float pt_size,
-        const char *filename)
-{
-    return NULL;
-}
-
-// ------------------------------------------- texture_font_new_from_memory ---
-texture_font_t *
-texture_font_new_from_memory(texture_atlas_t *atlas, float pt_size,
-        const void *memory_base, size_t memory_size)
-{
-    return NULL;
-}
-
-// ---------------------------------------------------- texture_font_delete ---
-void
-texture_font_delete( texture_font_t *self )
-{
-}
-
-
-// ----------------------------------------------- texture_font_load_glyphs ---
-size_t
-texture_font_load_glyphs( texture_font_t * self,
-                          const char * codepoints )
-{
-    return 0;
-}
-
-
-// ------------------------------------------------- texture_font_get_glyph ---
-texture_glyph_t *
-texture_font_get_glyph( texture_font_t * self,
-                        const char * codepoints )
-{
-    return NULL;
-}
-
-#endif // FT2 available

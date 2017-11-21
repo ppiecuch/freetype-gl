@@ -101,7 +101,6 @@ build_buffer( void )
         .size    = 10.0,
         .bold    = 0,
         .italic  = 0,
-        .rise    = 0.0,
         .spacing = p_interval,
         .gamma   = p_gamma,
         .foreground_color    = color,
@@ -161,11 +160,11 @@ build_buffer( void )
     font->kerning = p_kerning;
     font->filtering = 1;
     float norm = 1.0/(p_primary + 2*p_secondary + 2*p_tertiary);
-    font->lcd_weights[0] = (unsigned char)(p_tertiary*norm*256);
-    font->lcd_weights[1] = (unsigned char)(p_secondary*norm*256);
-    font->lcd_weights[2] = (unsigned char)(p_primary*norm*256);
-    font->lcd_weights[3] = (unsigned char)(p_secondary*norm*256);
-    font->lcd_weights[4] = (unsigned char)(p_tertiary*norm*256);
+    font->lcd_weights[0] = (unsigned char)(p_tertiary*norm*255);
+    font->lcd_weights[1] = (unsigned char)(p_secondary*norm*255);
+    font->lcd_weights[2] = (unsigned char)(p_primary*norm*255);
+    font->lcd_weights[3] = (unsigned char)(p_secondary*norm*255);
+    font->lcd_weights[4] = (unsigned char)(p_tertiary*norm*255);
     pen.x = 10;
     pen.y = 600 - font->height - 10;
     text_buffer_printf( text_buffer, &pen, &markup, text, NULL );
@@ -244,37 +243,26 @@ void quit( void* client_data )
     glfwSetWindowShouldClose( window, GL_TRUE );
 }
 
-// --------------------------------------------------------- get/set invert ---
-void TW_CALL set_invert( const void *value, void *data )
+// ------------------------------------------------------------ get/set int ---
+void TW_CALL set_int( const void *value, void *data )
 {
-    p_invert = *(const int *) value;
+    *(int *)data = *(const int *) value;
     build_buffer();
 }
-void TW_CALL get_invert( void *value, void *data )
+void TW_CALL get_int( void *value, void *data )
 {
-    *(int *)value = p_invert;
+    *(int *)value = *(int *)data;
 }
 
-// -------------------------------------------------------- get/set kerning ---
-void TW_CALL set_kerning( const void *value, void *data )
+// ---------------------------------------------------------- get/set float ---
+void TW_CALL set_float( const void *value, void *data )
 {
-    p_kerning = *(const int *) value;
+    *(float *) data = *(const float *) value;
     build_buffer();
 }
-void TW_CALL get_kerning( void *value, void *data )
+void TW_CALL get_float( void *value, void *data )
 {
-    *(int *)value = p_kerning;
-}
-
-// -------------------------------------------------------- get/set hinting ---
-void TW_CALL set_hinting( const void *value, void *data )
-{
-    p_hinting = *(const int *) value;
-    build_buffer();
-}
-void TW_CALL get_hinting( void *value, void *data )
-{
-    *(int *)value = p_hinting;
+    *(float *) value = *(const float *) data;
 }
 
 // -------------------------------------------------- get/set lcd_filtering ---
@@ -294,129 +282,6 @@ void TW_CALL set_lcd_filtering( const void *value, void *data )
 void TW_CALL get_lcd_filtering( void *value, void *data )
 {
     *(int *)value = p_lcd_filtering;
-}
-
-// --------------------------------------------------------- get/set weight ---
-void TW_CALL set_weight( const void *value, void *data )
-{
-    p_weight = *(const float *) value;
-}
-void TW_CALL get_weight( void *value, void *data )
-{
-    *(float *)value = p_weight;
-}
-
-// ---------------------------------------------------------- get/set gamma ---
-void TW_CALL set_gamma( const void *value, void *data )
-{
-    p_gamma = *(const float *) value;
-    build_buffer();
-}
-void TW_CALL get_gamma( void *value, void *data )
-{
-   *(float *)value = p_gamma;
-}
-
-// ---------------------------------------------------------- get/set width ---
-void TW_CALL set_width( const void *value, void *data )
-{
-    p_width = *(const float *) value;
-    build_buffer();
-}
-void TW_CALL get_width( void *value, void *data )
-{
-    *(float *)value = p_width;
-}
-
-// ------------------------------------------------------- get/set interval ---
-void TW_CALL set_interval( const void *value, void *data )
-{
-    p_interval = *(const float *) value;
-    build_buffer();
-}
-void TW_CALL get_interval( void *value, void *data )
-{
-    *(float *)value = p_interval;
-}
-
-// ---------------------------------------------------- get/set faux_weight ---
-void TW_CALL set_faux_weight( const void *value, void *data )
-{
-    p_faux_weight = *(const float *) value;
-}
-void TW_CALL get_faux_weight( void *value, void *data )
-{
-    *(float *)value = p_faux_weight;
-}
-
-// ---------------------------------------------------- get/set faux_italic ---
-void TW_CALL set_faux_italic( const void *value, void *data )
-{
-    p_faux_italic = *(const float *) value;
-    build_buffer();
-}
-void TW_CALL get_faux_italic( void *value, void *data )
-{
-    *(float *)value = p_faux_italic;
-}
-
-// ----------------------------------------------------------- get/set size ---
-void TW_CALL set_size( const void *value, void *data )
-{
-    p_size = *(const float *) value;
-    build_buffer();
-
-}
-void TW_CALL get_size( void *value, void *data )
-{
-    *(float *)value = p_size;
-}
-
-// --------------------------------------------------------- get/set family ---
-void TW_CALL set_family( const void *value, void *data )
-{
-    p_family = *(const font_family_e *) value;
-    build_buffer();
-}
-void TW_CALL get_family( void *value, void *data )
-{
-    *(font_family_e *)value = p_family;
-}
-
-// ----------------------------------------------------------- get/set primary ---
-void TW_CALL set_primary( const void *value, void *data )
-{
-    p_primary = *(const float *) value;
-    build_buffer();
-
-}
-void TW_CALL get_primary( void *value, void *data )
-{
-    *(float *)value = p_primary;
-}
-
-// ----------------------------------------------------------- get/set secondary ---
-void TW_CALL set_secondary( const void *value, void *data )
-{
-    p_secondary = *(const float *) value;
-    build_buffer();
-
-}
-void TW_CALL get_secondary( void *value, void *data )
-{
-    *(float *)value = p_secondary;
-}
-
-// ----------------------------------------------------------- get/set tertiary ---
-void TW_CALL set_tertiary( const void *value, void *data )
-{
-    p_tertiary = *(const float *) value;
-    build_buffer();
-
-}
-void TW_CALL get_tertiary( void *value, void *data )
-{
-    *(float *)value = p_tertiary;
 }
 
 
@@ -447,12 +312,12 @@ void init( GLFWwindow* window )
             {OLD_STANDARD, "Old Standard TT"},
             {LOBSTER,      "Lobster"} };
         TwType family_type = TwDefineEnum("Family", familyEV, NUM_FONTS);
-        TwAddVarCB(bar, "Family", family_type, set_family, get_family, NULL,
+        TwAddVarCB(bar, "Family", family_type, set_int, get_int, &p_family,
                    "label = 'Family'      "
                    "group = 'Font'        "
                    "help  = ' '           ");
     }
-    TwAddVarCB(bar, "Size", TW_TYPE_FLOAT, set_size, get_size, NULL,
+    TwAddVarCB(bar, "Size", TW_TYPE_FLOAT, set_float, get_float, &p_size,
                "label = 'Size' "
                "group = 'Font' "
                "min   = 6.0    "
@@ -466,23 +331,23 @@ void init( GLFWwindow* window )
 
 
     // Rendering
-    TwAddVarCB(bar, "Kerning", TW_TYPE_BOOL32, set_kerning, get_kerning, NULL,
+    TwAddVarCB(bar, "Kerning", TW_TYPE_BOOL32, set_int, get_int, &p_kerning,
                "label = 'Kerning'   "
                "group = 'Rendering' "
                "help  = ' '         ");
-    TwAddVarCB(bar, "Hinting", TW_TYPE_BOOL32, set_hinting, get_hinting, NULL,
+    TwAddVarCB(bar, "Hinting", TW_TYPE_BOOL32, set_int, get_int, &p_hinting,
                "label = 'Hinting'   "
                "group = 'Rendering' "
                "help  = ' '         ");
 
     // Color
-    TwAddVarCB(bar, "Invert", TW_TYPE_BOOL32, set_invert, get_invert, NULL,
+    TwAddVarCB(bar, "Invert", TW_TYPE_BOOL32, set_int, get_int, &p_invert,
                "label = 'Invert' "
                "group = 'Color'  "
                "help  = ' '      ");
 
     // Glyph
-    TwAddVarCB(bar, "Width", TW_TYPE_FLOAT, set_width, get_width, NULL,
+    TwAddVarCB(bar, "Width", TW_TYPE_FLOAT, set_float, get_float, &p_width,
                "label = 'Width' "
                "group = 'Glyph' "
                "min   = 0.75    "
@@ -490,7 +355,7 @@ void init( GLFWwindow* window )
                "step  = 0.01    "
                "help  = ' '     ");
 
-    TwAddVarCB(bar, "Interval", TW_TYPE_FLOAT, set_interval, get_interval, NULL,
+    TwAddVarCB(bar, "Interval", TW_TYPE_FLOAT, set_float, get_float, &p_interval,
                "label = 'Spacing' "
                "group = 'Glyph'   "
                "min   = -0.2      "
@@ -498,7 +363,7 @@ void init( GLFWwindow* window )
                "step  = 0.01      "
                "help  = ' '       " );
 
-    TwAddVarCB(bar, "Faux italic", TW_TYPE_FLOAT, set_faux_italic, get_faux_italic, NULL,
+    TwAddVarCB(bar, "Faux italic", TW_TYPE_FLOAT, set_float, get_float, &p_faux_italic,
                "label = 'Faux italic' "
                "group = 'Glyph'       "
                "min   = -30.0         "
@@ -507,7 +372,7 @@ void init( GLFWwindow* window )
                "help  = ' '           ");
 
     // Energy distribution
-    TwAddVarCB(bar, "Primary", TW_TYPE_FLOAT, set_primary, get_primary, NULL,
+    TwAddVarCB(bar, "Primary", TW_TYPE_FLOAT, set_float, get_float, &p_primary,
                "label = 'Primary weight'      "
                "group = 'Energy distribution' "
                "min   = 0                     "
@@ -515,7 +380,7 @@ void init( GLFWwindow* window )
                "step  = 0.01                  "
                "help  = ' '                   " );
 
-    TwAddVarCB(bar, "Secondary", TW_TYPE_FLOAT, set_secondary, get_secondary, NULL,
+    TwAddVarCB(bar, "Secondary", TW_TYPE_FLOAT, set_float, get_float, &p_secondary,
                "label = 'Secondy weight'      "
                "group = 'Energy distribution' "
                "min   = 0                     "
@@ -523,7 +388,7 @@ void init( GLFWwindow* window )
                "step  = 0.01                  "
                "help  = ' '                   " );
 
-    TwAddVarCB(bar, "Tertiary", TW_TYPE_FLOAT, set_tertiary, get_tertiary, NULL,
+    TwAddVarCB(bar, "Tertiary", TW_TYPE_FLOAT, set_float, get_float, &p_tertiary,
                "label = 'Tertiary weight'      "
                "group = 'Energy distribution' "
                "min   = 0                     "
@@ -534,7 +399,7 @@ void init( GLFWwindow* window )
     TwAddSeparator(bar, "",
                    "group = 'Energy distribution' " );
 
-    TwAddVarCB(bar, "Gamma", TW_TYPE_FLOAT, set_gamma, get_gamma, NULL,
+    TwAddVarCB(bar, "Gamma", TW_TYPE_FLOAT, set_float, get_float, &p_gamma,
                "label = 'Gamma correction'    "
                "group = 'Energy distribution' "
                "min   = 0.50                  "
@@ -583,19 +448,13 @@ void init( GLFWwindow* window )
 // ---------------------------------------------------------------- display ---
 void display( GLFWwindow* window )
 {
-    vec4 black  = {{0.0, 0.0, 0.0, 1.0}};
-    vec4 white  = {{1.0, 1.0, 1.0, 1.0}};
-
     if( !p_invert )
     {
         glClearColor( 0, 0, 0, 1 );
-        text_buffer->base_color = white;
-
     }
     else
     {
         glClearColor( 1, 1, 1, 1 );
-        text_buffer->base_color = black;
     }
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
