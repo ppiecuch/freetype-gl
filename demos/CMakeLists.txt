@@ -46,7 +46,14 @@ if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/darwin/AntTeakBar")
 ELSE()
  find_package(AntTweakBar)
 ENDIF()
-find_package(FontConfig)
+if(APPLE AND EXISTS "/opt/local/lib/libfontconfig.a")
+ message(STATUS "Using fontconfig library from /opt/local/lib")
+ set(FONTCONFIG_INCLUDE_PATH "/opt/local/include")
+ set(FONTCONFIG_LIBRARY "/opt/local/lib/libfontconfig.a" "/opt/local/lib/libexpat.a")
+ set(FONTCONFIG_FOUND 1)
+ELSE()
+ find_package(FontConfig)
+ENDIF()
 
 add_library(demo-utils OBJECT
     mat4.h

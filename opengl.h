@@ -6,10 +6,8 @@
 #ifndef __OPEN_GL_H__
 #define __OPEN_GL_H__
 
-#if defined(QT_OPENGL_LIB)
-#  include <QtOpenGL>
-#elif defined(QT_GUI_LIB)
-#  include <qtopengl.h>
+#if defined(QT_OPENGL_LIB) || defined(QT_GUI_LIB)
+#  include <qopengl.h>
 #elif defined(__APPLE__)
 #   include "TargetConditionals.h"
 #   if TARGET_OS_SIMULATOR || TARGET_OS_IPHONE

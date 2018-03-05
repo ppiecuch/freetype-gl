@@ -4,10 +4,17 @@
  * file `LICENSE` for more details.
  */
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_STROKER_H
-#include FT_LCD_FILTER_H
+#ifndef FTGL_NO_FREETYPE
+
+#ifdef FTGL_FREETYPE_AMALGAMATE
+# define FT_AMALGAMATE
+# include <FreeTypeAmalgam.h>
+#else
+# include <ft2build.h>
+# include FT_FREETYPE_H
+# include FT_STROKER_H
+# include FT_LCD_FILTER_H
+#endif
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,6 +30,7 @@
 #define DPI   72
 
 #undef __FTERRORS_H__
+#define AMALGAM_FTERRORS_H
 #define FT_ERRORDEF( e, v, s )  { e, s },
 #define FT_ERROR_START_LIST     {
 #define FT_ERROR_END_LIST       { 0, 0 } };
@@ -30,7 +38,11 @@ const struct {
     int          code;
     const char*  message;
 } FT_Errors[] =
-#include FT_ERRORS_H
+#ifdef FT_AMALGAMATE
+# include <FreeTypeAmalgam.h>
+#else
+# include FT_ERRORS_H
+#endif
 
 // ------------------------------------------------- texture_font_load_face ---
 static int
@@ -564,7 +576,7 @@ cleanup_stroker:
         int top;
         int right;
         int bottom;
-    } padding = { 0, 0, 1, 1 };
+    } padding = { 1, 1, 1, 1 };
 
     if( self->rendermode == RENDER_SIGNED_DISTANCE_FIELD )
     {
@@ -730,3 +742,50 @@ texture_font_enlarge_atlas( texture_font_t * self, size_t width_new,
     	g->t1 *= mulh;
     }
 }
+
+#else
+
+  texture_font_t *
+  texture_font_new_from_file( texture_atlas_t * atlas, const float pt_size, const char * filename ) {
+      printf("*** texture_font_new_from_file unsupported\n"); return 0; }
+
+  texture_font_t *
+  texture_font_new_from_memory( texture_atlas_t *atlas, float pt_size, const void *memory_base, size_t memory_size ) { printf("*** texture_font_new_from_memory unsupported\n"); return 0; }
+
+  void
+  texture_font_delete( texture_font_t * self ) { printf("*** texture_font_delete unsupported\n"); }
+
+  texture_glyph_t *
+  texture_font_get_glyph( texture_font_t * self, const char * codepoint ) {
+      printf("*** texture_font_get_glyph unsupported\n"); return 0; }
+
+  texture_glyph_t *
+  texture_font_find_glyph( texture_font_t * self, const char * codepoint ) {
+      printf("*** texture_font_find_glyph unsupported\n"); return 0; }
+
+  int
+  texture_font_load_glyph( texture_font_t * self, const char * codepoint ) {
+      printf("*** texture_font_load_glyph unsupported\n"); return 0; }
+
+  size_t
+  texture_font_load_glyphs( texture_font_t * self, const char * codepoints ) {
+      printf("*** texture_font_load_glyphs unsupported\n"); return 0; }
+
+  void
+  texture_font_enlarge_atlas( texture_font_t * self, size_t width_new, size_t height_new) {
+      printf("*** texture_font_enlarge_atlas unsupported\n"); return; }
+
+  float
+  texture_glyph_get_kerning( const texture_glyph_t * self, const char * codepoint ) {
+      printf("*** texture_glyph_get_kerning unsupported\n"); return 0; }
+
+
+/**
+ * Creates a new empty glyph
+ *
+ * @return a new empty glyph (not valid)
+ */
+texture_glyph_t *
+texture_glyph_new( void );
+
+#endif // FT_NO_FREETYPE

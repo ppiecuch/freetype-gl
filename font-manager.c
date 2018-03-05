@@ -14,11 +14,20 @@
 #include <string.h>
 #include "font-manager.h"
 
+#ifdef QT_CORE_LIB
+# include <stdbool.h>
+bool qftglFileExits(const char *filename);
+size_t qftglFileSize(const char *filename);
+size_t qftglReadFile(const char *filename, char *buffer, size_t maxSize);
+#endif
 
 // ------------------------------------------------------------ file_exists ---
 static int
 file_exists( const char * filename )
 {
+#ifdef QT_CORE_LIB
+    return qftglFileExits(filename);
+#else
     FILE * file = fopen( filename, "r" );
     if ( file )
     {
@@ -26,6 +35,7 @@ file_exists( const char * filename )
         return 1;
     }
     return 0;
+#endif
 }
 
 

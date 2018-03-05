@@ -24,7 +24,7 @@
 void print_help()
 {
     fprintf( stderr, "Usage: makefont [--help] --font <font file> "
-             "--header <header file> --size <font size> "
+             "--header <header file> --format <bmfont|c> --size <font size> "
              "--variable <variable name> --texture <texture size> "
              "--rendermode <one of 'normal', 'outline_edge', 'outline_positive', 'outline_negative' or 'sdf'>\n" );
 }
@@ -101,6 +101,7 @@ int main( int argc, char **argv )
     rendermodes[RENDER_OUTLINE_POSITIVE] = "outline added";
     rendermodes[RENDER_OUTLINE_NEGATIVE] = "outline removed";
     rendermodes[RENDER_SIGNED_DISTANCE_FIELD] = "signed distance field";
+    enum { BMFONT, C_HDR} hdr_format = C_HDR;
 
     for ( arg = 1; arg < argc; ++arg )
     {
@@ -375,201 +376,206 @@ int main( int argc, char **argv )
     // -------------
     // Header
     // -------------
-    fprintf( file,
-        "/* ============================================================================\n"
-        " * Freetype GL - A C OpenGL Freetype engine\n"
-        " * Platform:    Any\n"
-        " * WWW:         https://github.com/rougier/freetype-gl\n"
-        " * ----------------------------------------------------------------------------\n"
-        " * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.\n"
-        " *\n"
-        " * Redistribution and use in source and binary forms, with or without\n"
-        " * modification, are permitted provided that the following conditions are met:\n"
-        " *\n"
-        " *  1. Redistributions of source code must retain the above copyright notice,\n"
-        " *     this list of conditions and the following disclaimer.\n"
-        " *\n"
-        " *  2. Redistributions in binary form must reproduce the above copyright\n"
-        " *     notice, this list of conditions and the following disclaimer in the\n"
-        " *     documentation and/or other materials provided with the distribution.\n"
-        " *\n"
-        " * THIS SOFTWARE IS PROVIDED BY NICOLAS P. ROUGIER ''AS IS'' AND ANY EXPRESS OR\n"
-        " * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF\n"
-        " * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO\n"
-        " * EVENT SHALL NICOLAS P. ROUGIER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,\n"
-        " * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES\n"
-        " * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;\n"
-        " * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND\n"
-        " * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n"
-        " * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF\n"
-        " * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
-        " *\n"
-        " * The views and conclusions contained in the software and documentation are\n"
-        " * those of the authors and should not be interpreted as representing official\n"
-        " * policies, either expressed or implied, of Nicolas P. Rougier.\n"
-        " * ============================================================================\n"
-        " */\n");
-
-
-    // ----------------------
-    // Structure declarations
-    // ----------------------
-    fprintf( file,
-        "#include <stddef.h>\n"
-        "#include <stdint.h>\n"
-        "#ifdef __cplusplus\n"
-        "extern \"C\" {\n"
-        "#endif\n"
-        "\n"
-        "typedef struct\n"
-        "{\n"
-        "    uint32_t codepoint;\n"
-        "    float kerning;\n"
-        "} kerning_t;\n\n" );
-
-    fprintf( file,
-        "typedef struct\n"
-        "{\n"
-        "    uint32_t codepoint;\n"
-        "    int width, height;\n"
-        "    int offset_x, offset_y;\n"
-        "    float advance_x, advance_y;\n"
-        "    float s0, t0, s1, t1;\n"
-        "    size_t kerning_count;\n"
-        "    kerning_t kerning[%" PRIzu "];\n"
-        "} texture_glyph_t;\n\n", max_kerning_count );
-
-    fprintf( file,
-        "typedef struct\n"
-        "{\n"
-        "    size_t tex_width;\n"
-        "    size_t tex_height;\n"
-        "    size_t tex_depth;\n"
-        "    char tex_data[%" PRIzu "];\n"
-        "    float size;\n"
-        "    float height;\n"
-        "    float linegap;\n"
-        "    float ascender;\n"
-        "    float descender;\n"
-        "    size_t glyphs_count;\n"
-        "    texture_glyph_t glyphs[%" PRIzu "];\n"
-        "} texture_font_t;\n\n", texture_size, glyph_count );
-
-
-
-    fprintf( file, "texture_font_t %s = {\n", variable_name );
-
-
-    // ------------
-    // Texture data
-    // ------------
-    fprintf( file, " %" PRIzu ", %" PRIzu ", %" PRIzu ", \n", atlas->width, atlas->height, atlas->depth );
-    fprintf( file, " {" );
-    for( i=0; i < texture_size; i+= 32 )
+    if(hdr_format == BMFONT)
     {
-        for( j=0; j < 32 && (j+i) < texture_size ; ++ j)
+    }
+    else // C_HDR
+    {
+        fprintf( file,
+            "/* ============================================================================\n"
+            " * Freetype GL - A C OpenGL Freetype engine\n"
+            " * Platform:    Any\n"
+            " * WWW:         https://github.com/rougier/freetype-gl\n"
+            " * ----------------------------------------------------------------------------\n"
+            " * Copyright 2011,2012 Nicolas P. Rougier. All rights reserved.\n"
+            " *\n"
+            " * Redistribution and use in source and binary forms, with or without\n"
+            " * modification, are permitted provided that the following conditions are met:\n"
+            " *\n"
+            " *  1. Redistributions of source code must retain the above copyright notice,\n"
+            " *     this list of conditions and the following disclaimer.\n"
+            " *\n"
+            " *  2. Redistributions in binary form must reproduce the above copyright\n"
+            " *     notice, this list of conditions and the following disclaimer in the\n"
+            " *     documentation and/or other materials provided with the distribution.\n"
+            " *\n"
+            " * THIS SOFTWARE IS PROVIDED BY NICOLAS P. ROUGIER ''AS IS'' AND ANY EXPRESS OR\n"
+            " * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF\n"
+            " * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO\n"
+            " * EVENT SHALL NICOLAS P. ROUGIER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,\n"
+            " * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES\n"
+            " * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;\n"
+            " * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND\n"
+            " * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n"
+            " * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF\n"
+            " * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+            " *\n"
+            " * The views and conclusions contained in the software and documentation are\n"
+            " * those of the authors and should not be interpreted as representing official\n"
+            " * policies, either expressed or implied, of Nicolas P. Rougier.\n"
+            " * ============================================================================\n"
+            " */\n");
+
+
+        // ----------------------
+        // Structure declarations
+        // ----------------------
+        fprintf( file,
+            "#include <stddef.h>\n"
+            "#include <stdint.h>\n"
+            "#ifdef __cplusplus\n"
+            "extern \"C\" {\n"
+            "#endif\n"
+            "\n"
+            "typedef struct\n"
+            "{\n"
+            "    uint32_t codepoint;\n"
+            "    float kerning;\n"
+            "} kerning_t;\n\n" );
+
+        fprintf( file,
+            "typedef struct\n"
+            "{\n"
+            "    uint32_t codepoint;\n"
+            "    int width, height;\n"
+            "    int offset_x, offset_y;\n"
+            "    float advance_x, advance_y;\n"
+            "    float s0, t0, s1, t1;\n"
+            "    size_t kerning_count;\n"
+            "    kerning_t kerning[%" PRIzu "];\n"
+            "} texture_glyph_t;\n\n", max_kerning_count );
+
+        fprintf( file,
+            "typedef struct\n"
+            "{\n"
+            "    size_t tex_width;\n"
+            "    size_t tex_height;\n"
+            "    size_t tex_depth;\n"
+            "    char tex_data[%" PRIzu "];\n"
+            "    float size;\n"
+            "    float height;\n"
+            "    float linegap;\n"
+            "    float ascender;\n"
+            "    float descender;\n"
+            "    size_t glyphs_count;\n"
+            "    texture_glyph_t glyphs[%" PRIzu "];\n"
+            "} texture_font_t;\n\n", texture_size, glyph_count );
+
+
+
+        fprintf( file, "texture_font_t %s = {\n", variable_name );
+
+
+        // ------------
+        // Texture data
+        // ------------
+        fprintf( file, " %" PRIzu ", %" PRIzu ", %" PRIzu ", \n", atlas->width, atlas->height, atlas->depth );
+        fprintf( file, " {" );
+        for( i=0; i < texture_size; i+= 32 )
         {
-            if( (j+i) < (texture_size-1) )
+            for( j=0; j < 32 && (j+i) < texture_size ; ++ j)
             {
-                fprintf( file, "%d,", atlas->data[i+j] );
+                if( (j+i) < (texture_size-1) )
+                {
+                    fprintf( file, "%d,", atlas->data[i+j] );
+                }
+                else
+                {
+                    fprintf( file, "%d", atlas->data[i+j] );
+                }
+            }
+            if( (j+i) < texture_size )
+            {
+                fprintf( file, "\n  " );
+            }
+        }
+        fprintf( file, "}, \n" );
+
+
+        // -------------------
+        // Texture information
+        // -------------------
+        fprintf( file, " %ff, %ff, %ff, %ff, %ff, %" PRIzu ", \n",
+                font->size, font->height,
+                font->linegap,font->ascender, font->descender,
+                glyph_count );
+
+        // --------------
+        // Texture glyphs
+        // --------------
+        fprintf( file, " {\n" );
+        for( i=0; i < glyph_count; ++i )
+        {
+            texture_glyph_t * glyph = *(texture_glyph_t **) vector_get( font->glyphs, i );
+
+#if 0
+            // Debugging information
+            printf( "glyph : '%lc'\n",
+                    glyph->codepoint );
+            printf( "  size       : %dx%d\n",
+                    glyph->width, glyph->height );
+            printf( "  offset     : %+d%+d\n",
+                    glyph->offset_x, glyph->offset_y );
+            printf( "  advance    : %ff, %ff\n",
+                    glyph->advance_x, glyph->advance_y );
+            printf( "  tex coords.: %ff, %ff, %ff, %ff\n",
+                    glyph->u0, glyph->v0, glyph->u1, glyph->v1 );
+
+            printf( "  kerning    : " );
+            if( glyph->kerning_count )
+            {
+                for( j=0; j < glyph->kerning_count; ++j )
+                {
+                    printf( "('%lc', %ff)",
+                            glyph->kerning[j].codepoint, glyph->kerning[j].kerning );
+                    if( j < (glyph->kerning_count-1) )
+                    {
+                        printf( ", " );
+                    }
+                }
             }
             else
             {
-                fprintf( file, "%d", atlas->data[i+j] );
+                printf( "None" );
             }
-        }
-        if( (j+i) < texture_size )
-        {
-            fprintf( file, "\n  " );
-        }
-    }
-    fprintf( file, "}, \n" );
+            printf( "\n\n" );
+#endif // Debug info
 
-
-    // -------------------
-    // Texture information
-    // -------------------
-    fprintf( file, " %ff, %ff, %ff, %ff, %ff, %" PRIzu ", \n",
-             font->size, font->height,
-             font->linegap,font->ascender, font->descender,
-             glyph_count );
-
-    // --------------
-    // Texture glyphs
-    // --------------
-    fprintf( file, " {\n" );
-    for( i=0; i < glyph_count; ++i )
-    {
-        texture_glyph_t * glyph = *(texture_glyph_t **) vector_get( font->glyphs, i );
-
-/*
-        // Debugging information
-        printf( "glyph : '%lc'\n",
-                 glyph->codepoint );
-        printf( "  size       : %dx%d\n",
-                 glyph->width, glyph->height );
-        printf( "  offset     : %+d%+d\n",
-                 glyph->offset_x, glyph->offset_y );
-        printf( "  advance    : %ff, %ff\n",
-                 glyph->advance_x, glyph->advance_y );
-        printf( "  tex coords.: %ff, %ff, %ff, %ff\n",
-                 glyph->u0, glyph->v0, glyph->u1, glyph->v1 );
-
-        printf( "  kerning    : " );
-        if( glyph->kerning_count )
-        {
-            for( j=0; j < glyph->kerning_count; ++j )
-            {
-                printf( "('%lc', %ff)",
-                         glyph->kerning[j].codepoint, glyph->kerning[j].kerning );
-                if( j < (glyph->kerning_count-1) )
+            // TextureFont
+            fprintf( file, "  {%u, ", glyph->codepoint );
+            fprintf( file, "%" PRIzu ", %" PRIzu ", ", glyph->width, glyph->height );
+            fprintf( file, "%d, %d, ", glyph->offset_x, glyph->offset_y );
+            fprintf( file, "%ff, %ff, ", glyph->advance_x, glyph->advance_y );
+            fprintf( file, "%ff, %ff, %ff, %ff, ", glyph->s0, glyph->t0, glyph->s1, glyph->t1 );
+            fprintf( file, "%" PRIzu ", ", vector_size(glyph->kerning) );
+            if (vector_size(glyph->kerning) == 0) {
+                fprintf( file, "0" );
+            }
+            else {
+                fprintf( file, "{ " );
+                for( j=0; j < vector_size(glyph->kerning); ++j )
                 {
-                    printf( ", " );
+                    kerning_t *kerning = (kerning_t *) vector_get( glyph->kerning, j);
+
+                    fprintf( file, "{%u, %ff}", kerning->codepoint, kerning->kerning );
+                    if( j < (vector_size(glyph->kerning)-1))
+                    {
+                        fprintf( file, ", " );
+                    }
                 }
+                fprintf( file, "}" );
             }
+            fprintf( file, " },\n" );
         }
-        else
-        {
-            printf( "None" );
-        }
-        printf( "\n\n" );
-*/
+        fprintf( file, " }\n};\n" );
 
+        fprintf( file,
+            "#ifdef __cplusplus\n"
+            "}\n"
+            "#endif\n" );
 
-        // TextureFont
-        fprintf( file, "  {%u, ", glyph->codepoint );
-        fprintf( file, "%" PRIzu ", %" PRIzu ", ", glyph->width, glyph->height );
-        fprintf( file, "%d, %d, ", glyph->offset_x, glyph->offset_y );
-        fprintf( file, "%ff, %ff, ", glyph->advance_x, glyph->advance_y );
-        fprintf( file, "%ff, %ff, %ff, %ff, ", glyph->s0, glyph->t0, glyph->s1, glyph->t1 );
-        fprintf( file, "%" PRIzu ", ", vector_size(glyph->kerning) );
-        if (vector_size(glyph->kerning) == 0) {
-            fprintf( file, "0" );
-        }
-        else {
-            fprintf( file, "{ " );
-            for( j=0; j < vector_size(glyph->kerning); ++j )
-            {
-                kerning_t *kerning = (kerning_t *) vector_get( glyph->kerning, j);
-
-                fprintf( file, "{%u, %ff}", kerning->codepoint, kerning->kerning );
-                if( j < (vector_size(glyph->kerning)-1))
-                {
-                    fprintf( file, ", " );
-                }
-            }
-            fprintf( file, "}" );
-        }
-        fprintf( file, " },\n" );
-    }
-    fprintf( file, " }\n};\n" );
-
-    fprintf( file,
-        "#ifdef __cplusplus\n"
-        "}\n"
-        "#endif\n" );
-
-    fclose( file );
+        fclose( file );
+    } // hdr_format
 
     // ------------------
     // Dump texture image
