@@ -380,9 +380,7 @@ int main( int argc, char **argv )
     {
         // BEGIN BMFONT
         // END BMFONT
-
-        goto end_export;
-    }
+    } else {
 
     // BEGIN C_HDR
 
@@ -583,7 +581,9 @@ int main( int argc, char **argv )
 
     // END C_HDR
 
-end_export:
+    }
+
+
     // ------------------
     // Dump texture image
     // ------------------

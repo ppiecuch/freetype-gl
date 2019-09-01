@@ -185,55 +185,37 @@ texture_atlas_get_region( texture_atlas_t * self,
     best_height = UINT_MAX;
     best_index  = -1;
     best_width = UINT_MAX;
-<<<<<<< HEAD
 
-	for( i=0; i<self->nodes->size; ++i )
-	{
+    for( i=0; i<self->nodes->size; ++i )
+    {
         size_t awidth = width, aheight = height;
         y = texture_atlas_fit( self, i, width + self->spacing_horiz, height + self->spacing_vert );
-		if( y < 0 && self->spacing_horiz > 0)
+        if( y < 0 && self->spacing_horiz > 0)
             y = texture_atlas_fit( self, i, width + self->spacing_horiz, height );
         else
             awidth = width + self->spacing_horiz, aheight = height + self->spacing_vert;
-		if( y < 0 && self->spacing_vert > 0)
+        if( y < 0 && self->spacing_vert > 0)
             y = texture_atlas_fit( self, i, width, height + self->spacing_vert );
         else
             awidth = width + self->spacing_horiz, aheight = height;
-		if( y < 0)
+        if( y < 0)
             y = texture_atlas_fit( self, i, width, height );
         else
             awidth = width, aheight = height + self->spacing_vert;
-		if( y >= 0 )
-		{
-            node = (ivec3 *) vector_get( self->nodes, i );
-			if( ( (y + aheight) < best_height ) ||
-                ( ((y + aheight) == best_height) && (node->z > 0 && (size_t)node->z < best_width)) )
-			{
-				best_height = y + aheight;
-				best_index = i;
-				best_width = node->z;
-				region.x = node->x;
-				region.y = y;
-				region.width = awidth;
-				region.height = aheight;
-			}
-=======
-    for( i=0; i<self->nodes->size; ++i )
-    {
-        y = texture_atlas_fit( self, i, width, height );
         if( y >= 0 )
         {
             node = (ivec3 *) vector_get( self->nodes, i );
-            if( ( (y + height) < best_height ) ||
-                ( ((y + height) == best_height) && (node->z > 0 && (size_t)node->z < best_width)) )
+            if( ( (y + aheight) < best_height ) ||
+                ( ((y + aheight) == best_height) && (node->z > 0 && (size_t)node->z < best_width)) )
             {
-                best_height = y + height;
+                best_height = y + aheight;
                 best_index = i;
                 best_width = node->z;
                 region.x = node->x;
                 region.y = y;
+                region.width = awidth;
+                region.height = aheight;
             }
->>>>>>> 37ac8fbd54d115e8639cf186c2b3a0f9719b20c6
         }
     }
 
