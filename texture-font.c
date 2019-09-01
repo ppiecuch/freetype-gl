@@ -94,7 +94,10 @@ texture_font_load_face(texture_font_t *self, float size,
     }
 
     /* Set char size */
-    error = FT_Set_Char_Size(*face, (int)(size * HRES), 0, DPI * HRES, DPI);
+    error =
+        size<0 // points or pixels
+        ? FT_Set_Pixel_Sizes(*face, (int)-size, (int)-size)
+        : FT_Set_Char_Size(*face, (int)(size * HRES), 0, DPI * HRES, DPI);
 
     if(error) {
         fprintf(stderr, "FT_Error (line %d, code 0x%02x) : %s\n",
@@ -387,6 +390,13 @@ int
 texture_font_load_glyph( texture_font_t * self,
                          const char * codepoint )
 {
+    return texture_font_load_glyph_2(self, codepoint) > 0;
+}
+
+int
+texture_font_load_glyph_2( texture_font_t * self,
+                           const char * codepoint )
+{
     size_t i, x, y;
 
     FT_Library library;
@@ -584,13 +594,10 @@ cleanup_stroker:
         padding.left = 1;
     }
 	
-    if (self->padding != 0)
-    {
-	padding.top += self->padding;
-	padding.left += self->padding;
-	padding.right += self->padding;
-	padding.bottom += self->padding;
-    }
+    padding.top += self->padding_top;
+    padding.left += self->padding_left;
+    padding.right += self->padding_right;
+    padding.bottom += self->padding_bottom;
 
     size_t src_w = ft_bitmap.width/self->atlas->depth;
     size_t src_h = ft_bitmap.rows;
@@ -605,7 +612,7 @@ cleanup_stroker:
         fprintf( stderr, "Texture atlas is full (line %d)\n",  __LINE__ );
         FT_Done_Face( face );
         FT_Done_FreeType( library );
-        return 0;
+        return -1;
     }
 
     x = region.x;
@@ -671,10 +678,8 @@ size_t
 texture_font_load_glyphs( texture_font_t * self,
                           const char * codepoints )
 {
-    size_t i, c;
-
     /* Load each glyph */
-    for( i = 0; i < strlen(codepoints); i += utf8_surrogate_len(codepoints + i) ) {
+    for( size_t i = 0; i < strlen(codepoints); i += utf8_surrogate_len(codepoints + i) ) {
         if( !texture_font_load_glyph( self, codepoints + i ) )
             return utf8_strlen( codepoints + i );
     }
@@ -796,4 +801,4 @@ texture_font_enlarge_atlas( texture_font_t * self, size_t width_new,
 texture_glyph_t *
 texture_glyph_new( void );
 
-#endif // FT_NO_FREETYPE
+#endif // FTGL_NO_FREETYPE

@@ -325,7 +325,7 @@ typedef struct texture_font_t
 	* The padding to be add to the glyph's texture that are loaded by this font.
 	* Usefull when adding effects with shaders.
 	*/
-	int padding;
+	int padding_top, padding_bottom, padding_left, padding_right;
 
 } texture_font_t;
 
@@ -415,11 +415,24 @@ typedef struct texture_font_t
  * @param self       A valid texture font
  * @param codepoints Character codepoint to be loaded in UTF-8 encoding.
  *
- * @return One if the glyph could be loaded, zero if not.
+ * @return 1 if the glyph could be loaded, 0 if not.
  */
   int
   texture_font_load_glyph( texture_font_t * self,
                            const char * codepoint );
+
+/**
+ * Request the loading of a given glyph.
+ *
+ * @param self       A valid texture font
+ * @param codepoints Character codepoint to be loaded in UTF-8 encoding.
+ *
+ * @return 1 if the glyph could be loaded, 0 if not.
+ * @return -1 if atlas is full.
+ */
+  int
+  texture_font_load_glyph_2( texture_font_t * self,
+                             const char * codepoint );
 
 /**
  * Request the loading of several glyphs at once.

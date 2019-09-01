@@ -121,9 +121,10 @@ texture_atlas_fit( texture_atlas_t * self,
     width_left = width;
 	i = index;
 
+    // no space for `width` region
 	if ( (x + width) > (self->width-1) )
     {
-		return -1;
+        return -1;
     }
 	y = node->y;
 	while( width_left > 0 )
@@ -184,20 +185,36 @@ texture_atlas_get_region( texture_atlas_t * self,
     best_height = UINT_MAX;
     best_index  = -1;
     best_width = UINT_MAX;
+
 	for( i=0; i<self->nodes->size; ++i )
 	{
-        y = texture_atlas_fit( self, i, width, height );
+        size_t awidth = width, aheight = height;
+        y = texture_atlas_fit( self, i, width + self->spacing_horiz, height + self->spacing_vert );
+		if( y < 0 && self->spacing_horiz > 0)
+            y = texture_atlas_fit( self, i, width + self->spacing_horiz, height );
+        else
+            awidth = width + self->spacing_horiz, aheight = height + self->spacing_vert;
+		if( y < 0 && self->spacing_vert > 0)
+            y = texture_atlas_fit( self, i, width, height + self->spacing_vert );
+        else
+            awidth = width + self->spacing_horiz, aheight = height;
+		if( y < 0)
+            y = texture_atlas_fit( self, i, width, height );
+        else
+            awidth = width, aheight = height + self->spacing_vert;
 		if( y >= 0 )
 		{
             node = (ivec3 *) vector_get( self->nodes, i );
-			if( ( (y + height) < best_height ) ||
-                ( ((y + height) == best_height) && (node->z > 0 && (size_t)node->z < best_width)) )
+			if( ( (y + aheight) < best_height ) ||
+                ( ((y + aheight) == best_height) && (node->z > 0 && (size_t)node->z < best_width)) )
 			{
-				best_height = y + height;
+				best_height = y + aheight;
 				best_index = i;
 				best_width = node->z;
 				region.x = node->x;
 				region.y = y;
+				region.width = awidth;
+				region.height = aheight;
 			}
         }
     }
@@ -219,8 +236,8 @@ texture_atlas_get_region( texture_atlas_t * self,
         exit( EXIT_FAILURE );
     }
     node->x = region.x;
-    node->y = region.y + height;
-    node->z = width;
+    node->y = region.y + region.height;
+    node->z = region.width;
     vector_insert( self->nodes, best_index, node );
     free( node );
 

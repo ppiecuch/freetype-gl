@@ -90,6 +90,11 @@ typedef struct texture_atlas_t
      */
     size_t height;
 
+	/**
+	* The horizontal and vertical spacing between regions.
+	*/
+	size_t spacing_horiz, spacing_vert;
+
     /**
      * Depth (in bytes) of the underlying texture
      */
