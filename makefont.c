@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 
 #ifndef WIN32
@@ -24,7 +25,7 @@
 void print_help()
 {
     fprintf( stderr, "Usage: makefont [--help] --font <font file> "
-             "--header <header file> --format <bmfont|c> --size <font size> "
+             "--header <header file> --size <font size> "
              "--variable <variable name> --texture <texture size> "
              "--rendermode <one of 'normal', 'outline_edge', 'outline_positive', 'outline_negative' or 'sdf'>\n" );
 }
@@ -94,6 +95,7 @@ int main( int argc, char **argv )
     const char * variable_name   = "font";
     int show_help = 0;
     size_t texture_width = 128;
+    int padding = 0;
     rendermode_t rendermode = RENDER_NORMAL;
     const char *rendermodes[5];
     rendermodes[RENDER_NORMAL] = "normal";
@@ -101,7 +103,6 @@ int main( int argc, char **argv )
     rendermodes[RENDER_OUTLINE_POSITIVE] = "outline added";
     rendermodes[RENDER_OUTLINE_NEGATIVE] = "outline removed";
     rendermodes[RENDER_SIGNED_DISTANCE_FIELD] = "signed distance field";
-    enum { BMFONT, C_HDR} hdr_format = C_HDR;
 
     for ( arg = 1; arg < argc; ++arg )
     {
@@ -241,6 +242,38 @@ int main( int argc, char **argv )
             continue;
         }
 
+        if ( 0 == strcmp( "--padding", argv[arg] ) || 0 == strcmp( "-p", argv[arg] ) )
+        {
+            ++arg;
+
+            if ( 0 != padding )
+            {
+                fprintf( stderr, "Multiple --padding parameters.\n" );
+                print_help();
+                exit( 1 );
+            }
+
+            if ( arg >= argc )
+            {
+                fprintf( stderr, "No padding value given.\n" );
+                print_help();
+                exit( 1 );
+            }
+
+            errno = 0;
+
+            padding = atoi( argv[arg] );
+
+            if ( errno )
+            {
+                fprintf( stderr, "No valid padding value given.\n" );
+                print_help();
+                exit( 1 );
+            }
+
+            continue;
+        }
+
         if ( 0 == strcmp( "--rendermode", argv[arg] ) || 0 == strcmp( "-r", argv[arg] ) )
         {
             ++arg;
@@ -332,6 +365,8 @@ int main( int argc, char **argv )
 
     texture_atlas_t * atlas = texture_atlas_new( texture_width, texture_width, 1 );
     texture_font_t  * font  = texture_font_new_from_file( atlas, font_size, font_filename );
+    if ( 0 != padding)
+        font->padding_left = font->padding_right = font->padding_top = font->padding_bottom = padding;
     font->rendermode = rendermode;
 
     size_t missed = texture_font_load_glyphs( font, font_cache );
@@ -370,17 +405,53 @@ int main( int argc, char **argv )
     }
 
 
-    FILE *file = fopen( header_filename, "w" );
-
 
     // -------------
-    // Header
+    // Headers
     // -------------
-    if(hdr_format == BMFONT)
+
+    // BEGIN BMFONT
+
+    // <?xml version="1.0"?>
+    // <font>
+    // <info face="HGE font" size="32" bold="0" italic="0" charset="" unicode="0" stretchH="100" smooth="1" aa="1" padding="0,0,0,0" spacing="2,2" />
+    // <common lineHeight="27" base="27" scaleW="256" scaleH="136" pages="1" packed="0" />
+    // <pages>
+    //   <page id="0" file="HGE_font1.png" />
+    // </pages>
+    // <chars count="95" >
+    //   <char id="32" x="0" y="0" width="8" height="27" xoffset="0" yoffset="0" xadvance="8" page="0" chnl="0" letter=" " />
+    //   <char id="33" x="8" y="0" width="5" height="27" xoffset="0" yoffset="0" xadvance="5" page="0" chnl="0" letter="!" />
+    //   ...
+    // </chars>
+    // </font>
+
+    char bmf_header_filename[PATH_MAX]; strncpy(bmf_header_filename, header_filename, PATH_MAX);
+
+    const char *dot = strrchr(bmf_header_filename, '.');
+    if(!dot || dot == bmf_header_filename)
+        strcat(bmf_header_filename, ".fnt");
+    else
+        strcpy(dot, ".fnt");
+
+    FILE *bfile = fopen( bmf_header_filename, "w" );
+
+    // --------------
+    // Texture glyphs
+    // --------------
+    fprintf( bfile, "<chars count=\"%d\">\n", glyph_count );
+    for( i=0; i < glyph_count; ++i )
     {
-        // BEGIN BMFONT
-        // END BMFONT
-    } else {
+        texture_glyph_t * glyph = *(texture_glyph_t **) vector_get( font->glyphs, i );
+        fprintf( bfile, "  <char />\n" );
+    }
+
+    fclose(bfile);
+
+    // END BMFONT
+
+
+    FILE *file = fopen( header_filename, "w" );
 
     // BEGIN C_HDR
 
@@ -578,10 +649,6 @@ int main( int argc, char **argv )
         "#endif\n" );
 
     fclose( file );
-
-    // END C_HDR
-
-    }
 
 
     // ------------------
