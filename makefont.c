@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <limits.h>
 
 
@@ -70,11 +71,41 @@ void dumpimage( const char *buffer, const int width, const int height, const int
     tga_header[16] = bpp; // 16,24,32
 
     fwrite( tga_header, sizeof(uint8_t), 18, out );
-    fwrite( data, sizeof(uint8_t), width * height * (bpp/8), out );
+
+    // save flipped data:
+    const int chan = bpp / 8;
+    const size_t lsize = width * chan;
+    const uint8_t *data_end = data + width*height*chan - lsize;
+    for(int y=0; y<height; y++)
+    {
+        fwrite( data_end - y*lsize, sizeof(uint8_t), lsize, out );
+    }
 
     fclose( out );
     if(depth == 1)
         free( buffer );
+}
+
+const char *xml_entity(uint32_t codepoint)
+{
+    static const char *const NAMED_ENTITIES[][2] = {
+        { "&amp;", "&"},
+        { "&gt;", ">" },
+        { "&lt;", "<" },
+        { "&copy;", "©" },
+        { "&quot;", "\"" },
+        { "&reg", "®" },
+        { "&apos;", "'" },
+        { 0, 0 }
+    };
+
+    int index = 0; while (NAMED_ENTITIES[index][0]) {
+        if (codepoint == *NAMED_ENTITIES[index][1])
+            return NAMED_ENTITIES[index][0];
+        ++index;
+    }
+
+    return 0;
 }
 
 // ------------------------------------------------------------------- main ---
@@ -95,7 +126,7 @@ int main( int argc, char **argv )
     const char * variable_name   = "font";
     int show_help = 0;
     size_t texture_width = 128;
-    int padding = 0;
+    float padding = 0;
     rendermode_t rendermode = RENDER_NORMAL;
     const char *rendermodes[5];
     rendermodes[RENDER_NORMAL] = "normal";
@@ -262,7 +293,7 @@ int main( int argc, char **argv )
 
             errno = 0;
 
-            padding = atoi( argv[arg] );
+            padding = atof( argv[arg] );
 
             if ( errno )
             {
@@ -410,7 +441,90 @@ int main( int argc, char **argv )
     // Headers
     // -------------
 
+    // ------------------
+    // Dump texture image
+    // ------------------
+    char image_filename[PATH_MAX]; strncpy(image_filename, header_filename, PATH_MAX);
+    char *ext = strrchr(image_filename, '.');
+    if (ext != NULL)
+        strcpy(ext, ".tga");
+    else
+        strcat(image_filename, ".tga");
+
+    dumpimage(atlas->data, atlas->width, atlas->height, atlas->depth, image_filename);
+
+
     // BEGIN BMFONT
+
+    // File tags
+    // =========
+    //
+    // info
+    // ----
+    //
+    // This tag holds information on how the font was generated.
+    //
+    // face     This is the name of the true type font.
+    // size     The size of the true type font.
+    // bold     The font is bold.
+    // italic   The font is italic.
+    // charset  The name of the OEM charset used (when not unicode).
+    // unicode  Set to 1 if it is the unicode charset.
+    // stretchH The font height stretch in percentage. 100% means no stretch.
+    // smooth   Set to 1 if smoothing was turned on.
+    // aa       The supersampling level used. 1 means no supersampling was used.
+    // padding  The padding for each character (up, right, down, left).
+    // spacing  The spacing for each character (horizontal, vertical).
+    // outline  The outline thickness for the characters.
+    //
+    // common
+    // ------
+    //
+    // This tag holds information common to all characters.
+    //
+    // lineHeight   This is the distance in pixels between each line of text.
+    // base         The number of pixels from the absolute top of the line to the base of the characters.
+    // scaleW       The width of the texture, normally used to scale the x pos of the character image.
+    // scaleH       The height of the texture, normally used to scale the y pos of the character image.
+    // pages        The number of texture pages included in the font.
+    // packed       Set to 1 if the monochrome characters have been packed into each of the texture channels. In this case alphaChnl describes what is stored in each channel.
+    // alphaChnl    Set to 0 if the channel holds the glyph data, 1 if it holds the outline, 2 if it holds the glyph and the outline, 3 if its set to zero, and 4 if its set to one.
+    // redChnl      Set to 0 if the channel holds the glyph data, 1 if it holds the outline, 2 if it holds the glyph and the outline, 3 if its set to zero, and 4 if its set to one.
+    // greenChnl    Set to 0 if the channel holds the glyph data, 1 if it holds the outline, 2 if it holds the glyph and the outline, 3 if its set to zero, and 4 if its set to one.
+    // blueChnl     Set to 0 if the channel holds the glyph data, 1 if it holds the outline, 2 if it holds the glyph and the outline, 3 if its set to zero, and 4 if its set to one.
+    //
+    // page
+    // ----
+    //
+    // This tag gives the name of a texture file. There is one for each page in the font.
+    //
+    // id   The page id.
+    // file The texture file name.
+    //
+    // char
+    // ----
+    //
+    // This tag describes on character in the font. There is one for each included character in the font.
+    //
+    // id       The character id.
+    // x        The left position of the character image in the texture.
+    // y        The top position of the character image in the texture.
+    // width    The width of the character image in the texture.
+    // height   The height of the character image in the texture.
+    // xoffset  How much the current position should be offset when copying the image from the texture to the screen.
+    // yoffset  How much the current position should be offset when copying the image from the texture to the screen.
+    // xadvance How much the current position should be advanced after drawing the character.
+    // page     The texture page where the character image is found.
+    // chnl     The texture channel where the character image is found (1 = blue, 2 = green, 4 = red, 8 = alpha, 15 = all channels).
+    //
+    // kerning
+    // -------
+    //
+    // The kerning information is used to adjust the distance between certain characters, e.g. some characters should be placed closer to each other than others.
+    //
+    // first    The first character id.
+    // second   The second character id.
+    // amount   How much the x position should be adjusted when drawing the second character immediately following the first.
 
     // <?xml version="1.0"?>
     // <font>
@@ -426,15 +540,35 @@ int main( int argc, char **argv )
     // </chars>
     // </font>
 
-    char bmf_header_filename[PATH_MAX]; strncpy(bmf_header_filename, header_filename, PATH_MAX);
+#define roundi(x) (int)round(x)
 
-    const char *dot = strrchr(bmf_header_filename, '.');
+    char bmf_header_filename[PATH_MAX]; strncpy(bmf_header_filename, header_filename, PATH_MAX);
+    char *dot = strrchr(bmf_header_filename, '.');
     if(!dot || dot == bmf_header_filename)
         strcat(bmf_header_filename, ".fnt");
     else
         strcpy(dot, ".fnt");
 
     FILE *bfile = fopen( bmf_header_filename, "w" );
+
+    const char *base_font_file = strrchr( font_filename, '/' );
+
+    fprintf( bfile, "<?xml version=\"1.0\"?>\n<font>\n" );
+    fprintf( bfile, "<info face=\"%s\" size=\"%d\" bold=\"0\" italic=\"0\" charset=\"\" unicode=\"0\" stretchH=\"100\" smooth=\"1\" aa=\"1\" padding=\"%d,%d,%d,%d\" spacing=\"0,0\" />\n",
+        base_font_file?base_font_file+1:font_filename,
+        roundi(font->size),
+        roundi(font->padding_left),
+        roundi(font->padding_right),
+        roundi(font->padding_top),
+        roundi(font->padding_bottom)
+    );
+    fprintf( bfile, "<common lineHeight=\"%d\" base=\"27\" scaleW=\"256\" scaleH=\"136\" pages=\"1\" packed=\"0\" />\n",
+        roundi(font->height)
+    );
+
+    fprintf( bfile, "<pages>\n" );
+    fprintf( bfile, "  <page id=\"0\" file=\"%s\" />\n", image_filename );
+    fprintf( bfile, "</pages>\n" );
 
     // --------------
     // Texture glyphs
@@ -443,8 +577,27 @@ int main( int argc, char **argv )
     for( i=0; i < glyph_count; ++i )
     {
         texture_glyph_t * glyph = *(texture_glyph_t **) vector_get( font->glyphs, i );
-        fprintf( bfile, "  <char />\n" );
+        const char *xml_ent = xml_entity(glyph->codepoint);
+        if (xml_ent)
+            fprintf( bfile, "  <char id=\"%u\" x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" xoffset=\"%d\" yoffset=\"%d\" xadvance=\"%d\" page=\"0\" chnl=\"0\" letter=\"%s\"/>\n",
+                glyph->codepoint,
+                roundi(glyph->s0*atlas->width), roundi(glyph->t0*atlas->height),
+                roundi(glyph->width), roundi(glyph->height),
+                roundi(glyph->offset_x), roundi(glyph->offset_y),
+                roundi(glyph->advance_x),
+                xml_ent
+            );
+        else
+            fprintf( bfile, "  <char id=\"%u\" x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" xoffset=\"%d\" yoffset=\"%d\" xadvance=\"%d\" page=\"0\" chnl=\"0\" letter=\"%lc\"/>\n",
+                glyph->codepoint,
+                roundi(glyph->s0*atlas->width), roundi(glyph->t0*atlas->height),
+                roundi(glyph->width), roundi(glyph->height),
+                roundi(glyph->offset_x), roundi(glyph->offset_y),
+                roundi(glyph->advance_x),
+                glyph->codepoint
+            );
     }
+    fprintf( bfile, "</chars>\n</font>\n" );
 
     fclose(bfile);
 
@@ -649,18 +802,6 @@ int main( int argc, char **argv )
         "#endif\n" );
 
     fclose( file );
-
-
-    // ------------------
-    // Dump texture image
-    // ------------------
-    char *ext = strrchr(header_filename, '.');
-    if (ext != NULL)
-        strcpy(ext, ".tga");
-    else
-        strcat(header_filename, ".tga");
-
-    dumpimage(atlas->data, atlas->width, atlas->height, atlas->depth, header_filename);
 
     return 0;
 }

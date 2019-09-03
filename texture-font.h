@@ -325,7 +325,7 @@ typedef struct texture_font_t
     * The padding to be add to the glyph's texture that are loaded by this font.
     * Usefull when adding effects with shaders.
     */
-    int padding_top, padding_bottom, padding_left, padding_right;
+    float padding_top, padding_bottom, padding_left, padding_right;
 
 } texture_font_t;
 

@@ -272,7 +272,9 @@ texture_font_init(texture_font_t *self)
     FT_Done_FreeType( library );
 
     /* NULL is a special glyph */
+#if 0
     texture_font_get_glyph( self, NULL );
+#endif
 
     return 0;
 }
