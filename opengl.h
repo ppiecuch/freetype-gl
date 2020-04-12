@@ -8,7 +8,10 @@
 
 #if defined(QT_OPENGL_LIB) || defined(QT_GUI_LIB)
 #  include <qopengl.h>
-#elif defined(__APPLE__)
+#elif defined(GL_WITH_GLAD)
+#   include <glad/glad.h>
+#else
+#if defined(__APPLE__)
 #   include "TargetConditionals.h"
 #   if TARGET_OS_SIMULATOR || TARGET_OS_IPHONE
 #     if defined(FREETYPE_GL_ES_VERSION_3_0)
@@ -27,6 +30,7 @@
 #else
 #  include <GL/glew.h>
 #  include <GL/gl.h>
-#endif
+#endif /* __APPLE__ */
+#endif /* GL_WITH_GLAD */
 
 #endif /* OPEN_GL_H */

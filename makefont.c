@@ -185,7 +185,7 @@ int main( int argc, char **argv )
     const char * header_filename = NULL;
     const char * variable_name   = "font";
     int show_help = 0;
-    size_t texture_width = 128;
+    size_t texture_width = 0;
     int depth = 1;
     float padding[4] = {0,0,0,0}; // left,right,top,bottom
     size_t spacing = 0;
@@ -307,7 +307,7 @@ int main( int argc, char **argv )
         {
             ++arg;
 
-            if ( 128.0 != texture_width )
+            if ( 0 != texture_width )
             {
                 fprintf( stderr, "Multiple --texture parameters.\n" );
                 print_help();
@@ -405,16 +405,9 @@ int main( int argc, char **argv )
         {
             ++arg;
 
-            if ( 128.0 != texture_width )
-            {
-                fprintf( stderr, "Multiple --texture parameters.\n" );
-                print_help();
-                exit( 1 );
-            }
-
             if ( arg >= argc )
             {
-                fprintf( stderr, "No texture size given.\n" );
+                fprintf( stderr, "No render mode given.\n" );
                 print_help();
                 exit( 1 );
             }
@@ -488,6 +481,12 @@ int main( int argc, char **argv )
         fprintf( stderr, "No header file given.\n" );
         print_help();
         exit( 1 );
+    }
+
+<<<<<<< HEAD
+    if ( 0 == texture_width )
+    {
+        texture_width = 128;
     }
 
     int auto_size = font_size < 0;
@@ -791,7 +790,19 @@ int main( int argc, char **argv )
         " * those of the authors and should not be interpreted as representing official\n"
         " * policies, either expressed or implied, of Nicolas P. Rougier.\n"
         " * ============================================================================\n"
-        " */\n");
+        " */\n\n");
+
+    fprintf( file, 
+        "/* ============================================================================\n"
+        " * Parameters\n"
+        " * ----------------------------------------------------------------------------\n"
+        " * Font size: %f\n"
+        " * Texture width: %d\n"
+        " * Texture height: %d\n"
+        " * Texture depth: %d\n"
+        " * ===============================================================================\n"
+        " */\n\n", 
+        font_size, atlas->width, atlas->height, atlas->depth);
 
 
     // ----------------------
@@ -828,7 +839,7 @@ int main( int argc, char **argv )
         "    size_t tex_width;\n"
         "    size_t tex_height;\n"
         "    size_t tex_depth;\n"
-        "    char tex_data[%" PRIzu "];\n"
+        "    unsigned char tex_data[%" PRIzu "];\n"
         "    float size;\n"
         "    float height;\n"
         "    float linegap;\n"
