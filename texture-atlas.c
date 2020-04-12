@@ -81,12 +81,12 @@ texture_atlas_set_region( texture_atlas_t * self,
     size_t charsize;
 
     assert( self );
-    assert( x > 0);
-    assert( y > 0);
-    assert( x < (self->width-1));
-    assert( (x + width) <= (self->width-1));
-    assert( y < (self->height-1));
-    assert( (y + height) <= (self->height-1));
+    assert( x > 0 );
+    assert( y > 0 );
+    assert( x < (self->width-1) );
+    assert( (x + width) <= (self->width-1) );
+    assert( y < (self->height-1) );
+    assert( (y + height) <= (self->height-1) );
 
     // prevent copying data from undefined position
     // and prevent memcpy's undefined behavior when count is zero

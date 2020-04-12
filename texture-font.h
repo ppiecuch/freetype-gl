@@ -123,6 +123,16 @@ typedef struct texture_glyph_t
     uint32_t codepoint;
 
     /**
+     * Glyph's x position in atlas pixels.
+     */
+    size_t x;
+
+    /**
+     * Glyph's y position in atlas pixels.
+     */
+    size_t y;
+
+    /**
      * Glyph's width in pixels.
      */
     size_t width;
@@ -180,6 +190,11 @@ typedef struct texture_glyph_t
     float t1;
 
     /**
+     * Glyph's raw data-only rectangle.
+     */
+    size_t data_x, data_y, data_width, data_height;
+
+    /**
      * A vector of kerning pairs relative to this glyph.
      */
     vector_t * kerning;
@@ -235,6 +250,11 @@ typedef struct texture_font_t
             size_t size;
         } memory;
     };
+
+    /**
+     * Font family
+     */
+    char *family[64];
 
     /**
      * Font size

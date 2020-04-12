@@ -249,6 +249,9 @@ texture_font_init(texture_font_t *self)
     if (!texture_font_load_face(self, self->size * 100.f, &library, &face))
         return -1;
 
+    if (face->family_name)
+        strncpy(self->family, face->family_name, 64);
+
     self->underline_position = face->underline_position / (float)(HRESf*HRESf) * self->size;
     self->underline_position = roundf( self->underline_position );
     if( self->underline_position > -2 )
@@ -620,15 +623,15 @@ cleanup_stroker:
     x = region.x;
     y = region.y;
 
-    unsigned char *buffer = calloc( tgt_w * tgt_h * self->atlas->depth, sizeof(unsigned char) );
-
+    const size_t line_bytes = tgt_w * self->atlas->depth;
+    unsigned char *buffer = calloc( tgt_h * line_bytes, sizeof(unsigned char) );
     unsigned char *dst_ptr = buffer + (padding.top * tgt_w + padding.left) * self->atlas->depth;
     unsigned char *src_ptr = ft_bitmap.buffer;
     for( i = 0; i < src_h; i++ )
     {
         //difference between width and pitch: https://www.freetype.org/freetype2/docs/reference/ft2-basic_types.html#FT_Bitmap
         memcpy( dst_ptr, src_ptr, ft_bitmap.width);
-        dst_ptr += tgt_w * self->atlas->depth;
+        dst_ptr += line_bytes;
         src_ptr += ft_bitmap.pitch;
     }
 
@@ -639,28 +642,34 @@ cleanup_stroker:
         buffer = sdf;
     }
 
-    texture_atlas_set_region( self->atlas, x, y, tgt_w, tgt_h, buffer, tgt_w * self->atlas->depth);
+    texture_atlas_set_region( self->atlas, x, y, tgt_w, tgt_h, buffer, line_bytes );
 
     free( buffer );
 
     glyph = texture_glyph_new( );
-    glyph->codepoint = utf8_to_utf32( codepoint );
-    glyph->width    = tgt_w;
-    glyph->height   = tgt_h;
+    glyph->codepoint  = utf8_to_utf32( codepoint );
+    glyph->x          = x;
+    glyph->y          = y;
+    glyph->width      = tgt_w;
+    glyph->height     = tgt_h;
     glyph->rendermode = self->rendermode;
     glyph->outline_thickness = self->outline_thickness;
-    glyph->offset_x = ft_glyph_left;
-    glyph->offset_y = ft_glyph_top;
-    glyph->s0       = x/(float)self->atlas->width;
-    glyph->t0       = y/(float)self->atlas->height;
-    glyph->s1       = (x + glyph->width)/(float)self->atlas->width;
-    glyph->t1       = (y + glyph->height)/(float)self->atlas->height;
+    glyph->offset_x   = ft_glyph_left-padding.left;
+    glyph->offset_y   = ft_glyph_top+padding.top;
+    glyph->s0         = x/(float)self->atlas->width;
+    glyph->t0         = y/(float)self->atlas->height;
+    glyph->s1         = (x + glyph->width)/(float)self->atlas->width;
+    glyph->t1         = (y + glyph->height)/(float)self->atlas->height;
+    glyph->data_x     = x+padding.left;
+    glyph->data_y     = y+padding.top;
+    glyph->data_width = src_w;
+    glyph->data_height= src_h;
 
     // Discard hinting to get advance
     FT_Load_Glyph( face, glyph_index, FT_LOAD_RENDER | FT_LOAD_NO_HINTING);
     slot = face->glyph;
-    glyph->advance_x = slot->advance.x / HRESf;
-    glyph->advance_y = slot->advance.y / HRESf;
+    glyph->advance_x = fmax(slot->advance.x / HRESf, tgt_w+glyph->offset_x); // texture might be bigger because of the padding
+    glyph->advance_y = fmax(slot->advance.y / HRESf, tgt_h);                 // (advance should be no less then texture size)
 
     vector_push_back( self->glyphs, &glyph );
 
