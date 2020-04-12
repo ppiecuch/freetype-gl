@@ -254,7 +254,7 @@ typedef struct texture_font_t
     /**
      * Font family
      */
-    char *family[64];
+    char family[64];
 
     /**
      * Font size

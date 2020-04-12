@@ -12,6 +12,7 @@
 #   include <glad/glad.h>
 #else
 #if defined(__APPLE__)
+#   define GL_SILENCE_DEPRECATION
 #   include "TargetConditionals.h"
 #   if TARGET_OS_SIMULATOR || TARGET_OS_IPHONE
 #     if defined(FREETYPE_GL_ES_VERSION_3_0)
