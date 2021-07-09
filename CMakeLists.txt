@@ -17,6 +17,11 @@ set(CMAKE_PREFIX_PATH
     "${CMAKE_SOURCE_DIR}/darwin"
 )
 ENDIF(APPLE)
+# The additional / is important to remove the last character from the path.
+# Note that it does not matter if the OS uses / or \, because we are only
+# saving the path size.
+string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)
+add_definitions("-DSOURCE_PATH_SIZE=${SOURCE_PATH_SIZE}")
 
 message(STATUS "Building for ${CMAKE_SYSTEM_NAME} target system")
 message(STATUS "Building with ${CMAKE_C_COMPILER_ID} compiler")
@@ -38,6 +43,7 @@ option(freetype-gl_BUILD_APIDOC "Build the freetype-gl API documentation" ON)
 option(freetype-gl_BUILD_HARFBUZZ "Build the freetype-gl harfbuzz support (experimental)" OFF)
 option(freetype-gl_BUILD_MAKEFONT "Build the makefont tool" ON)
 option(freetype-gl_BUILD_TESTS "Build the tests" ON)
+option(freetype-gl_BUILD_SHARED "Build shared library" OFF)
 
 include(RequireIncludeFile)
 include(RequireFunctionExists)
@@ -139,10 +145,12 @@ set(FREETYPE_GL_HDR
     texture-atlas.h
     texture-font.h
     utf8-utils.h
+    ftgl-utils.h
     vec234.h
     vector.h
     vertex-attribute.h
     vertex-buffer.h
+    freetype-gl-errdef.h
 )
 
 set(FREETYPE_GL_SRC
@@ -154,15 +162,43 @@ set(FREETYPE_GL_SRC
     texture-atlas.c
     texture-font.c
     utf8-utils.c
+    ftgl-utils.c
     vector.c
     vertex-attribute.c
     vertex-buffer.c
 )
 
-add_library(freetype-gl STATIC
-    ${FREETYPE_GL_SRC}
-    ${FREETYPE_GL_HDR}
-)
+if(NOT MSVC)
+	set(PKG_CONFIG_PREFIX ${CMAKE_INSTALL_PREFIX})
+	set(PKG_CONFIG_EXEC_PREFIX "\${prefix}")
+	set(PKG_CONFIG_LIBDIR "\${exec_prefix}/lib")
+	set(PKG_CONFIG_INCLUDEDIR "\${prefix}/include")
+	configure_file(freetype-gl.pc.in ${CMAKE_CURRENT_BINARY_DIR}/freetype-gl.pc @ONLY)
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/freetype-gl.pc DESTINATION ${PKG_CONFIG_PREFIX}/share/pkgconfig)
+endif()
+
+if(freetype-gl_BUILD_SHARED)
+    add_library(freetype-gl SHARED
+        ${FREETYPE_GL_SRC}
+        ${FREETYPE_GL_HDR}
+    )
+    SET_TARGET_PROPERTIES(
+        freetype-gl
+    PROPERTIES
+        VERSION 0.3.2
+        SOVERSION 0)
+    target_link_libraries (freetype-gl
+			   ${OPENGL_LIBRARY}
+			   ${FREETYPE_LIBRARIES}
+			   ${MATH_LIBRARY}
+			   ${GLEW_LIBRARY}
+			   )
+else()
+    add_library(freetype-gl STATIC
+        ${FREETYPE_GL_SRC}
+        ${FREETYPE_GL_HDR}
+    )
+endif()
 
 if(freetype-gl_BUILD_MAKEFONT)
     add_executable(makefont makefont.c)
@@ -206,3 +242,22 @@ if(freetype-gl_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif(freetype-gl_BUILD_TESTS)
+
+get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+
+if ("${LIB64}" STREQUAL "TRUE")
+    set(LIBSUFFIX 64)
+else()
+    set(LIBSUFFIX "")
+endif()
+
+set(INSTALL_LIB_DIR     lib${LIBSUFFIX} CACHE PATH "Installation directory for libraries")
+mark_as_advanced(INSTALL_LIB_DIR)
+
+install(TARGETS freetype-gl
+	ARCHIVE DESTINATION ${INSTALL_LIB_DIR}
+	LIBRARY DESTINATION ${INSTALL_LIB_DIR}
+	COMPONENT library)
+install(FILES ${FREETYPE_GL_HDR} DESTINATION include
+	COMPONENT headers)
+

@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "vector.h"
-
+#include "ftgl-utils.h"
 
 
 // ------------------------------------------------------------- vector_new ---
@@ -20,14 +20,13 @@ vector_new( size_t item_size )
 
     if( !self )
     {
-        fprintf( stderr,
-                 "line %d: No more memory for allocating data\n", __LINE__ );
-        exit( EXIT_FAILURE );
+	freetype_gl_error( Out_Of_Memory );
+	return NULL;
     }
     self->item_size = item_size;
     self->size      = 0;
     self->capacity  = 1;
-    self->items     = malloc( self->item_size * self->capacity );
+    self->items     = calloc( self->item_size, self->capacity );
     return self;
 }
 
@@ -131,6 +130,8 @@ vector_reserve( vector_t *self,
     if( self->capacity < size)
     {
         self->items = realloc( self->items, size * self->item_size );
+	memset( (char *)(self->items) + self->capacity * self->item_size, 0,
+		(size - self->capacity) * self->item_size );
         self->capacity = size;
     }
 }
@@ -166,6 +167,7 @@ vector_clear( vector_t *self )
 {
     assert( self );
 
+    memset( (char *)(self->items), 0, self->size * self->item_size);
     self->size = 0;
 }
 

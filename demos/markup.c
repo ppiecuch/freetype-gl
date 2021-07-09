@@ -101,7 +101,7 @@ void init()
     char *f_normal   = match_description("Droid Serif:size=24");
     char *f_bold     = match_description("Droid Serif:size=24:weight=bold");
     char *f_italic   = match_description("Droid Serif:size=24:slant=italic");
-    char *f_japanese = match_description("Droid Sans:size=18:lang=ja");
+    char *f_japanese = match_description("Droid Sans Japanese:size=18");
     char *f_math     = match_description("DejaVu Sans:size=24");
 
     markup_t normal = {
@@ -226,16 +226,13 @@ void display( GLFWwindow* window )
         glBindTexture( GL_TEXTURE_2D, font_manager->atlas->id );
 
         glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-        glBlendColor( 1, 1, 1, 1 );
 
         vertex_buffer_render( buffer->buffer, GL_TRIANGLES );
         glBindTexture( GL_TEXTURE_2D, 0 );
-        glBlendColor( 0, 0, 0, 0 );
         glUseProgram( 0 );
     }
 
     glBlendFunc( GL_ONE, GL_ONE_MINUS_SRC_ALPHA );
-    glBlendColor( 1.0, 1.0, 1.0, 1.0 );
     glUseProgram( bounds_shader );
     {
         glUniformMatrix4fv( glGetUniformLocation( bounds_shader, "model" ),
