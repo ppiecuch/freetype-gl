@@ -90,10 +90,12 @@ endif()
 
 find_package(OpenGL REQUIRED)
 if(APPLE AND EXISTS "/opt/local/lib/libfreetype.a")
- message(STATUS "Using freetype library from /opt/local/lib")
+ message(STATUS "Using freetype library from MacPorts /opt/local/lib")
  set(FREETYPE_INCLUDE_DIRS "/opt/local/include/freetype2")
  set(FREETYPE_LIBRARIES 
     "/opt/local/lib/libfreetype.a" 
+    "/opt/local/lib/libbrotlicommon-static.a"
+    "/opt/local/lib/libbrotlidec-static.a"
     "/opt/local/lib/libpng.a" 
     "/opt/local/lib/libz.a" 
     "/opt/local/lib/libbz2.a")

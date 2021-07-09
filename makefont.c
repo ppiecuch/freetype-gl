@@ -32,11 +32,13 @@ typedef enum {
 
 typedef struct libattopng_t libattopng_t;
 
+// quick png library:
 libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type);
 void libattopng_start_stream(libattopng_t* png, size_t x, size_t y);
 void libattopng_put_pixel(libattopng_t* png, uint32_t color);
 void libattopng_destroy(libattopng_t *png);
-
+int libattopng_save(libattopng_t *png, const char *filename);
+// end.
 
 // ------------------------------------------------------------- print help ---
 void print_help()
@@ -483,7 +485,6 @@ int main( int argc, char **argv )
         exit( 1 );
     }
 
-<<<<<<< HEAD
     if ( 0 == texture_width )
     {
         texture_width = 128;
@@ -709,7 +710,7 @@ int main( int argc, char **argv )
     const char *base_font_file = strrchr( font_filename, '/' );
 
     fprintf( bfile, "<?xml version=\"1.0\"?>\n<font>\n" );
-    fprintf( bfile, "<info face=\"%s\" size=\"%d\" bold=\"0\" italic=\"0\" charset=\"\" unicode=\"0\" stretchH=\"100\" smooth=\"1\" aa=\"1\" padding=\"%d,%d,%d,%d\" spacing=\"%d,%d\" />\n",
+    fprintf( bfile, "<info face=\"%s\" size=\"%d\" bold=\"0\" italic=\"0\" charset=\"\" unicode=\"0\" stretchH=\"100\" smooth=\"1\" aa=\"1\" padding=\"%d,%d,%d,%d\" spacing=\"%ld,%ld\" />\n",
         font->family?font->family:base_font_file?base_font_file+1:font_filename,
         roundi(font->size),
         roundi(font->padding_left),
