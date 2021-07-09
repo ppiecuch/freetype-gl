@@ -44,7 +44,7 @@ GLuint text_shader;
 
 // ------------------------------------------------------ match_description ---
 char *
-match_description( char * description )
+match_description( const char * description )
 {
 
 #if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
@@ -55,7 +55,7 @@ match_description( char * description )
 
     char *filename = 0;
     FcInit();
-    FcPattern *pattern = FcNameParse(description);
+    FcPattern *pattern = FcNameParse((const FcChar8 *)description);
     FcConfigSubstitute( 0, pattern, FcMatchPattern );
     FcDefaultSubstitute( pattern );
     FcResult result;

@@ -107,6 +107,8 @@ texture_glyph_new(void)
     self->outline_thickness = 0.0;
     self->glyphmode = GLYPH_END;
     /* End of attribute part */
+    self->x         = 0;
+    self->y         = 0;
     self->offset_x  = 0;
     self->offset_y  = 0;
     self->advance_x = 0.0;
@@ -401,6 +403,8 @@ texture_font_new_from_file(texture_atlas_t *atlas, const float pt_size,
         return NULL;
     }
 
+    self->family = 0;
+
     self->atlas = atlas;
     self->size  = pt_size;
 
@@ -431,6 +435,8 @@ texture_font_new_from_memory(texture_atlas_t *atlas, float pt_size,
         freetype_gl_error( Out_Of_Memory );
         return NULL;
     }
+
+    self->family = 0;
 
     self->atlas = atlas;
     self->size  = pt_size;
@@ -1001,6 +1007,8 @@ cleanup_stroker:
     glyph = texture_glyph_new( );
     glyph->codepoint = glyph_index ? ucodepoint : 0;
 
+    glyph->x          = x;
+    glyph->y          = y;
     glyph->width    = tgt_w;
     glyph->height   = tgt_h;
     glyph->rendermode = self->rendermode;

@@ -40,6 +40,10 @@ void libattopng_destroy(libattopng_t *png);
 int libattopng_save(libattopng_t *png, const char *filename);
 // end.
 
+#ifdef __APPLE__
+char *strrstr(const char *haystack, const char *needle);
+#endif
+
 // ------------------------------------------------------------- print help ---
 void print_help()
 {
@@ -51,11 +55,11 @@ void print_help()
 }
 
 // ------------------------------------------------------------- dump image ---
-void dumpimage_tga( const char *buffer, const int width, const int height, const int depth, const char* path )
+void dumpimage_tga( const unsigned char *buffer, const int width, const int height, const int depth, const char* path )
 {
     FILE* out = fopen( path, "wb" );
 
-    uint8_t *data = buffer; 
+    uint8_t *data = (uint8_t*)buffer;
     uint8_t bpp = depth*8;
     if(depth == 1) { // upscale from 8 to 16bit
         data = malloc(width * height * 2); for(int i=0; i<width*height*depth; i+=1) {
@@ -102,17 +106,17 @@ void dumpimage_tga( const char *buffer, const int width, const int height, const
     }
 
     fclose( out );
-    if(data != buffer)
-        free( buffer );
+    if(data != (uint8_t*)buffer)
+        free( data );
 }
 
-void dumpimage_png( const char *buffer, const int width, const int height, const int depth, const char* path )
+void dumpimage_png( const unsigned char *buffer, const int width, const int height, const int depth, const char* path )
 {
     libattopng_t* png = libattopng_new(width, height, PNG_RGBA);
 
     libattopng_start_stream(png, 0, 0);
 
-    uint8_t *data = buffer;
+    uint8_t *data = (uint8_t *)buffer;
     for(int y=0; y<height; y++)
     {
         for (int x = 0; x < width; x++) {
@@ -132,9 +136,9 @@ void dumpimage_png( const char *buffer, const int width, const int height, const
     libattopng_destroy(png);
 }
 
-void dumpimage( const char *buffer, const int width, const int height, const int depth, const char* path )
+void dumpimage( const unsigned char *buffer, const int width, const int height, const int depth, const char* path )
 {
-    const char *ext = strrchr(path, ".png");
+    const char *ext = strrstr(path, ".png");
     if (ext == 0 || ext == path)
         dumpimage_png(buffer, width, height, depth, path);
     else
@@ -162,7 +166,7 @@ const char *xml_entity(uint32_t codepoint)
 
     static char XML_CHAR[32];
     if (codepoint > 0xff)
-        sprintf(XML_CHAR, "&#04X;", codepoint);
+        sprintf(XML_CHAR, "&#%04X;", codepoint);
     else
         sprintf(XML_CHAR, "%c", codepoint);
 
@@ -204,9 +208,10 @@ int main( int argc, char **argv )
 {
     FILE* test;
     size_t i, j, k;
+    texture_glyph_t * glyph;
     int arg;
 
-    char * font_cache =
+    const char * font_cache =
         " !\"#$%&'()*+,-./0123456789:;<=>?"
         "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
         "`abcdefghijklmnopqrstuvwxyz{|}~";
@@ -586,10 +591,11 @@ int main( int argc, char **argv )
     printf( "Font filename           : %s\n"
             "Font size               : %.1f\n"
             "Padding                 : %.1f,%.1f,%.1f,%.1f\n"
-            "Number of glyphs        : %ld\n"
-            "Number of missed glyphs : %ld\n"
+            "Number of req. glyphs   : %" PRIzu "\n"
+            "Number of glyphs        : %" PRIzu "\n"
+            "Number of missed glyphs : %" PRIzu "\n"
             "Texture size            : %ldx%ldx%ld\n"
-            "Spacing                 : %ld,%ld\n"
+            "Spacing                 : %" PRIzu ",%" PRIzu "\n"
             "Texture occupancy       : %.2f%%\n"
             "\n"
             "Header filename         : %s\n"
@@ -599,6 +605,7 @@ int main( int argc, char **argv )
             font_size,
             font->padding_left, font->padding_right, font->padding_top, font->padding_bottom,
             strlen(font_cache),
+            vector_glyphs_size( font->glyphs ),
             missed,
             atlas->width, atlas->height, atlas->depth,
             atlas->spacing_horiz, atlas->spacing_vert,
@@ -607,22 +614,22 @@ int main( int argc, char **argv )
             variable_name,
             rendermodes[rendermode] );
 
-    size_t texture_size = atlas->width * atlas->height * atlas->depth;
-    size_t glyph_count = font->glyphs->size;
+    const size_t texture_size = atlas->width * atlas->height * atlas->depth;
+    const size_t glyph_count = vector_size( font->glyphs );
     size_t max_kerning_count = 1;
     for( i=0; i < glyph_count; ++i )
     {
         texture_glyph_t **glyph_0x100 = *(texture_glyph_t ***) vector_get( font->glyphs, i );
-	if(glyph_0x100) {
-	    for( j=0; j < 0x100; ++j ) {
-		texture_glyph_t *glyph;
-		if(( glyph = glyph_0x100[j] )) {
-		    size_t new_max = vector_size(glyph->kerning);
-		    if( new_max > max_kerning_count )
-			max_kerning_count = new_max;
-		}
-	    }
-	}
+        if(glyph_0x100) {
+            for( j=0; j < 0x100; ++j ) {
+                texture_glyph_t *glyph;
+                if(( glyph = glyph_0x100[j] )) {
+                    size_t new_max = vector_size(glyph->kerning);
+                    if( new_max > max_kerning_count )
+                        max_kerning_count = new_max;
+                }
+            }
+        }
     }
 
 
@@ -744,8 +751,8 @@ int main( int argc, char **argv )
     const char *base_font_file = strrchr( font_filename, '/' );
 
     fprintf( bfile, "<?xml version=\"1.0\"?>\n<font>\n" );
-    fprintf( bfile, "<info face=\"%s\" size=\"%d\" bold=\"0\" italic=\"0\" charset=\"\" unicode=\"0\" stretchH=\"100\" smooth=\"1\" aa=\"1\" padding=\"%d,%d,%d,%d\" spacing=\"%ld,%ld\" />\n",
-        font->family?font->family:base_font_file?base_font_file+1:font_filename,
+    fprintf( bfile, "<info face=\"%s\" size=\"%d\" bold=\"0\" italic=\"0\" charset=\"\" unicode=\"0\" stretchH=\"100\" smooth=\"1\" aa=\"1\" padding=\"%d,%d,%d,%d\" spacing=\"%" PRIzu ",%" PRIzu "\" />\n",
+        font->family ? font->family : base_font_file ? base_font_file+1 : font_filename,
         roundi(font->size),
         roundi(font->padding_left),
         roundi(font->padding_right),
@@ -754,7 +761,7 @@ int main( int argc, char **argv )
         atlas->spacing_horiz,
         atlas->spacing_vert
     );
-    fprintf( bfile, "<common lineHeight=\"%d\" base=\"%d\" scaleW=\"%d\" scaleH=\"%d\" pages=\"1\" packed=\"0\" />\n",
+    fprintf( bfile, "<common lineHeight=\"%d\" base=\"%d\" scaleW=\"%" PRIzu "\" scaleH=\"%" PRIzu "\" pages=\"1\" packed=\"0\" />\n",
         roundi(font->ascender - font->descender /* + font->linegap */),
         roundi(font->ascender),
         atlas->width,
@@ -768,18 +775,26 @@ int main( int argc, char **argv )
     // --------------
     // Texture glyphs
     // --------------
-    fprintf( bfile, "<chars count=\"%d\">\n", glyph_count );
+    fprintf( bfile, "<chars count=\"%" PRIzu "\">\n", glyph_count );
     for( i=0; i < glyph_count; ++i )
     {
-        texture_glyph_t * glyph = *(texture_glyph_t **) vector_get( font->glyphs, i );
-        fprintf( bfile, "  <char id=\"%u\" x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" data_x=\"%d\" data_y=\"%d\" data_width=\"%d\" data_height=\"%d\" xoffset=\"%d\" yoffset=\"%d\" xadvance=\"%d\" page=\"0\" chnl=\"0\" letter=\"%s\"/>\n",
-            glyph->codepoint,
-            glyph->x, glyph->y, glyph->width, glyph->height,
-            glyph->data_x, glyph->data_y, glyph->data_width, glyph->data_height,
-            roundi(glyph->offset_x), roundi(font->ascender - glyph->offset_y),
-            roundi(glyph->advance_x),
-            xml_entity(glyph->codepoint)
-        );
+        texture_glyph_t **glyph_0x100 = *(texture_glyph_t ***) vector_get( font->glyphs, i );
+        if (glyph_0x100)
+        {
+            for( j=0; j < 0x100; ++j ) {
+                texture_glyph_t *glyph;
+                if(( glyph = glyph_0x100[j] )) {
+                    fprintf( bfile, "  <char id=\"%u\" code=\"%u\" x=\"%" PRIzu "\" y=\"%" PRIzu "\" width=\"%" PRIzu "\" height=\"%" PRIzu "\" data_x=\"%" PRIzu "\" data_y=\"%" PRIzu "\" data_width=\"%" PRIzu "\" data_height=\"%" PRIzu "\" xoffset=\"%d\" yoffset=\"%d\" xadvance=\"%d\" page=\"0\" chnl=\"0\" letter=\"%s\"/>\n",
+                        glyph->codepoint, glyph->codepoint,
+                        glyph->x, glyph->y, glyph->width, glyph->height,
+                        glyph->data_x, glyph->data_y, glyph->data_width, glyph->data_height,
+                        roundi(glyph->offset_x), roundi(font->ascender - glyph->offset_y),
+                        roundi(glyph->advance_x),
+                        xml_entity(glyph->codepoint)
+                    );
+                }
+            }
+        }
     }
     fprintf( bfile, "</chars>\n</font>\n" );
 
@@ -832,9 +847,9 @@ int main( int argc, char **argv )
         " * Parameters\n"
         " * ----------------------------------------------------------------------------\n"
         " * Font size: %f\n"
-        " * Texture width: %ld\n"
-        " * Texture height: %ld\n"
-        " * Texture depth: %ld\n"
+        " * Texture width: %" PRIzu "\n"
+        " * Texture height: %" PRIzu "\n"
+        " * Texture depth: %" PRIzu "\n"
         " * ===============================================================================\n"
         " */\n\n", 
         font_size, atlas->width, atlas->height, atlas->depth);
@@ -885,10 +900,8 @@ int main( int argc, char **argv )
         "    texture_glyph_0x100_t glyphs[%" PRIzu "];\n"
         "} texture_font_t;\n\n", texture_size, glyph_count );
 
-    texture_glyph_t * glyph;
-
     GLYPHS_ITERATOR(i, glyph, font->glyphs) {
-        fprintf( file, "texture_glyph_t %s_glyph_%08x = ", variable_name, glyph->codepoint, glyph->codepoint );
+        fprintf( file, "texture_glyph_t %s_glyph_%08x = ", variable_name, glyph->codepoint );
         print_glyph(file, glyph);
     }
     GLYPHS_ITERATOR_END
@@ -1379,3 +1392,24 @@ void libattopng_destroy(libattopng_t *png) {
     png->data = NULL;
     free(png);
 }
+
+#ifdef __APPLE__
+/*
+ * The strrstr() function finds the last occurrence of the substring needle
+ * in the string haystack. The terminating nul characters are not compared.
+ */
+char *strrstr(const char *haystack, const char *needle)
+{
+	char *r = NULL;
+
+	if (!needle[0])
+		return (char*)haystack + strlen(haystack);
+	while (1) {
+		char *p = strstr(haystack, needle);
+		if (!p)
+			return r;
+		r = p;
+		haystack = p + 1;
+	}
+}
+#endif

@@ -306,9 +306,9 @@ typedef struct texture_font_t
     };
 
     /**
-     * Font family
+     * Font family (optional)
      */
-    char family[64];
+    char * family;
 
     /**
      * Texture font library
@@ -723,19 +723,31 @@ texture_glyph_delete( texture_glyph_t * self );
 
 #define GLYPHS_ITERATOR1(index, name, glyph) \
     for( index = 0; index < vector_size ( glyph ); index++ ) { \
-	texture_glyph_t ** __glyphs;
+        texture_glyph_t ** __glyphs;
 #define GLYPHS_ITERATOR2(index, name, glyph) \
-	if(( __glyphs = *(texture_glyph_t *** ) vector_get ( glyph, index ) )) { \
-	    int __i;							\
-	    for( __i = 0; __i < 0x100; __i++ ) {			\
-		if(( name = __glyphs[__i] ))
+    if(( __glyphs = *(texture_glyph_t *** ) vector_get ( glyph, index ) )) { \
+        for( int __i = 0; __i < 0x100; __i++ ) { \
+            if(( name = __glyphs[__i] ))
 #define GLYPHS_ITERATOR(index, name, glyph) \
-    GLYPHS_ITERATOR1(index, name, glyph)		\
-	GLYPHS_ITERATOR2(index, name, glyph)
+    GLYPHS_ITERATOR1(index, name, glyph) \
+    GLYPHS_ITERATOR2(index, name, glyph)
 
 #define GLYPHS_ITERATOR_END1 }
 #define GLYPHS_ITERATOR_END2 } }
 #define GLYPHS_ITERATOR_END } } }
+
+inline static
+size_t vector_glyphs_size( const vector_t *glyph ) {
+    int count = 0;
+    for( int index = 0; index < vector_size ( glyph ); index++ ) {
+        texture_glyph_t ** _glyphs;
+        if(( _glyphs = *(texture_glyph_t *** ) vector_get ( glyph, index ) ))
+            for( int i = 0; i < 0x100; i++ )
+                if( _glyphs[i] )
+                    count++;
+    }
+    return count;
+}
 
 #ifdef __cplusplus
 }
