@@ -44,6 +44,13 @@ int libattopng_save(libattopng_t *png, const char *filename);
 char *strrstr(const char *haystack, const char *needle);
 #endif
 
+static char *base_name(const char *path) {
+    char *base = strrchr( path, '/' );
+    if (base)
+        base++;
+    return base;
+}
+
 // ------------------------------------------------------------- print help ---
 void print_help()
 {
@@ -610,7 +617,7 @@ int main( int argc, char **argv )
             atlas->width, atlas->height, atlas->depth,
             atlas->spacing_horiz, atlas->spacing_vert,
             100.0 * atlas->used / (float)(atlas->width * atlas->height),
-            header_filename,
+            base_name(header_filename),
             variable_name,
             rendermodes[rendermode] );
 
@@ -748,11 +755,11 @@ int main( int argc, char **argv )
 
     FILE *bfile = fopen( bmf_header_filename, "w" );
 
-    const char *base_font_file = strrchr( font_filename, '/' );
+    char *base_font_file = base_name( font_filename );
 
     fprintf( bfile, "<?xml version=\"1.0\"?>\n<font>\n" );
     fprintf( bfile, "<info face=\"%s\" size=\"%d\" bold=\"0\" italic=\"0\" charset=\"\" unicode=\"0\" stretchH=\"100\" smooth=\"1\" aa=\"1\" padding=\"%d,%d,%d,%d\" spacing=\"%" PRIzu ",%" PRIzu "\" />\n",
-        font->family ? font->family : base_font_file ? base_font_file+1 : font_filename,
+        font->family ? font->family : base_font_file ? base_font_file : font_filename,
         roundi(font->size),
         roundi(font->padding_left),
         roundi(font->padding_right),
@@ -769,7 +776,7 @@ int main( int argc, char **argv )
     );
 
     fprintf( bfile, "<pages>\n" );
-    fprintf( bfile, "  <page id=\"0\" file=\"%s\" />\n", image_filename );
+    fprintf( bfile, "  <page id=\"0\" file=\"%s\" depth=\"%" PRIzu "\"/>\n", base_font_file, atlas->depth );
     fprintf( bfile, "</pages>\n" );
 
     // --------------
